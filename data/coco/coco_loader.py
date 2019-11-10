@@ -12,22 +12,27 @@ matplotlib.use('TkAgg')
 
 class CocoLoader(DataLoader):
 
+    def __init__(self, annotation_type='val2017', categories=None):
+        self.annotation_path = os.path.join(PATH, 'annotations/instances_{}.json'.format(annotation_type))
+        self.coco = COCO(self.annotation_path)
+
+        if categories is None:
+            self.categories = ['dog', 'cat']
+        else:
+            self.categories = categories
+
     def _load(self):
-        data_type = 'val2017'
-        annotation_file = os.path.join(PATH, 'annotations/instances_{}.json'.format(data_type))
-
-        # initialize COCO api for instance annotations
-        coco = COCO(annotation_file)
-
         # get all images containing given categories, select one at random
-        cat_ids = coco.getCatIds(catNms=['dog'])
-        img_ids = coco.getImgIds(catIds=cat_ids)
+        cat_ids = self.coco.getCatIds(catNms=self.categories)
+        img_ids = self.coco.getImgIds(catIds=cat_ids)
 
         print('Loading images... This may take a while.')
         images = []
         for img_id in img_ids:
-            img_data = coco.loadImgs(img_id)[0]
+            img_data = self.coco.loadImgs(img_id)[0]
             image = io.imread(img_data['coco_url'])
             images.append(image)
+
+        print(images[0].shape, images[1].shape)
 
         return images
