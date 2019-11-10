@@ -38,7 +38,6 @@ class HebbianEngine:
             learning_rate = self.learning_rate * (1 - epoch / epochs)
             logging.info('Learning rate = {}'.format(learning_rate))
 
-            print(samples, data.shape)
             data = data[np.random.permutation(samples), :]
 
             batch_range = trange(samples // batch_size, desc='Epoch {}/{}'.format(epoch + 1, epochs))

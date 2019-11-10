@@ -68,3 +68,17 @@ def draw_weights_update(fig, synapses, shape, height, width):
     fig.colorbar(im, ticks=[np.amin(data), 0, np.amax(data)])
     plt.axis('off')
     fig.canvas.draw()
+
+
+def show_image_patches(patches):
+    # Plot the results
+    plt.figure(figsize=(4.2, 4))
+    for i, patch in enumerate(patches):
+        plt.subplot(9, 9, i + 1)
+        plt.imshow(patch, interpolation='nearest', cmap='gray')
+        plt.xticks(())
+        plt.yticks(())
+
+    plt.suptitle('Patches', fontsize=16)
+
+    plt.show()
