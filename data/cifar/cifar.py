@@ -29,7 +29,6 @@ def load(dir_name='cifar-10-batches-py'):
 
     data = [np.transpose(np.reshape(array, (3, 32, 32)), (1, 2, 0)) for array in data]
     data = np.array(data)
-    data /= 255.0
 
     return np.array(data)
 
@@ -37,5 +36,7 @@ def load(dir_name='cifar-10-batches-py'):
 def load_gray(dir_name='cifar-10-batches-py'):
     color_data = load(dir_name)
     data = [cv.cvtColor(image, cv.COLOR_BGR2GRAY) for image in color_data]
+
+    data = np.divide(data, 255)
 
     return np.array(data)
