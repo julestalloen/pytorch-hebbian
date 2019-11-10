@@ -52,17 +52,14 @@ def draw_weights(synapses, shape, height, width):
 
 
 def draw_weights_update(fig, synapses, shape, height, width):
-    if len(shape) == 1:
-        dim = int(np.sqrt(int(shape[0])))
-    else:
-        dim = shape[0]
+    dim_y, dim_x = shape
 
     yy = 0
-    data = np.zeros((dim * height, dim * width))
+    data = np.zeros((dim_y * height, dim_x * width))
 
     for y in range(height):
         for x in range(width):
-            data[y * dim:(y + 1) * dim, x * dim:(x + 1) * dim] = synapses[yy, :].reshape(dim, dim)
+            data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x] = synapses[yy, :].reshape(dim_y, dim_x)
             yy += 1
 
     plt.clf()
