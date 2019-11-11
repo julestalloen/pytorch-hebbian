@@ -71,14 +71,12 @@ def draw_weights_update(fig, synapses, shape, height, width):
 
 
 def show_image_patches(patches):
-    # Plot the results
-    plt.figure(figsize=(4.2, 4))
+    plt.figure(figsize=(6, 5))
     for i, patch in enumerate(patches):
         plt.subplot(9, 9, i + 1)
         plt.imshow(patch, interpolation='nearest', cmap='gray')
         plt.xticks(())
         plt.yticks(())
 
-    plt.suptitle('Patches', fontsize=16)
-
+    plt.suptitle('Patches')
     plt.show()
