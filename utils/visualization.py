@@ -52,6 +52,7 @@ def draw_weights(synapses, shape, height, width):
 
 
 def draw_weights_update(fig, synapses, shape, height, width):
+    plt.pause(0.001)
     dim_y, dim_x = shape
 
     yy = 0
