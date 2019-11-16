@@ -43,7 +43,7 @@ def main_mnist():
     preprocessor = CommonPreprocessor(rescale=1/255)
     data = preprocessor.process(data)
 
-    learning_rule = KrotovsRule(delta=0.2, k=2, norm=2)
+    learning_rule = KrotovsRule(delta=0.1, k=3, norm=2)
     optimizer = Linear(learning_rate=0.02)
     learning_engine = HebbianEngine(learning_rule=learning_rule, optimizer=optimizer, visualize_weights=True)
     weights = learning_engine.fit(1600, data, epochs=100, batch_size=100)
