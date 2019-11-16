@@ -105,3 +105,4 @@ venv.bak/
 
 .idea/
 data/coco/annotations/
+data/coco/cache
