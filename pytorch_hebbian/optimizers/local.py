@@ -18,7 +18,7 @@ class Local(Optimizer):
 
         for group in self.param_groups:
             for p in group['params']:
-                p.data.add_(-group['lr'] * d_p)
+                p.data.add_(group['lr'] * d_p)
 
         # TODO: dirty fix
         self._step_count += 1

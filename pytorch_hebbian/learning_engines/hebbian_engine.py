@@ -5,6 +5,7 @@ import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
 import numpy as np
+from tqdm import tqdm
 
 from pytorch_hebbian.utils.visualization import draw_weights_update
 
@@ -39,15 +40,15 @@ class HebbianEngine:
 
         # Main loop
         for epoch in range(epochs):
-            print('epoch', epoch)
-            for i, data in enumerate(data_loader):
+            logging.info("Learning rate = {}.".format(self.lr_scheduler.get_lr()))
+            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(epoch + 1, epochs))
+            for i, data in enumerate(progress_bar):
                 inputs, labels = data
                 inputs = np.reshape(inputs.squeeze(), (inputs.shape[0], -1))
                 d_p = torch.from_numpy(self.learning_rule.update(inputs, synapses))
                 self.optimizer.local_step(d_p)
 
             self.lr_scheduler.step()
-            logging.info("Learning rate = {}.".format(self.lr_scheduler.get_lr()))
 
             if self.visualize_weights:
                 draw_weights_update(fig, synapses, input_shape)

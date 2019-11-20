@@ -22,21 +22,22 @@ def main_mnist():
         transforms.ToTensor()
     ])
     dataset = datasets.mnist.FashionMNIST(root='./datasets', download=True, transform=transform)
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=1000, shuffle=True)
 
     # Visualize some random images
     data_iter = iter(data_loader)
     images, labels = next(data_iter)
     show_image(torchvision.utils.make_grid(images))
 
+    epochs = 100
     learning_rule = KrotovsRule(delta=0.1, k=3, norm=2)
     optimizer = Local(params=model.parameters(), lr=0.02)
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=[lambda epoch: 0.95 * epoch])
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     learning_engine = HebbianEngine(learning_rule=learning_rule,
                                     optimizer=optimizer,
                                     lr_scheduler=lr_scheduler,
                                     visualize_weights=True)
-    weights = learning_engine.train(model=model, data_loader=data_loader, epochs=100)
+    weights = learning_engine.train(model=model, data_loader=data_loader, epochs=epochs)
 
     # draw_weights(weights, dataset[0].shape, 40, 40)
 
