@@ -5,7 +5,7 @@ from sklearn.feature_extraction.image import extract_patches_2d
 import numpy as np
 
 
-class ImageScanner:
+class ImageScan:
 
     def __init__(self, images):
         self.images = images
