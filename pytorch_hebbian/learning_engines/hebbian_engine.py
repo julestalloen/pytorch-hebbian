@@ -42,7 +42,7 @@ class HebbianEngine:
 
         # Main loop
         for epoch in range(epochs):
-            logging.info("Learning rate = {}.".format(self.lr_scheduler.get_lr()))
+            logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(epoch + 1, epochs))
             for i, data in enumerate(progress_bar):
                 inputs, labels = data
@@ -59,4 +59,4 @@ class HebbianEngine:
         plt.ioff()
         plt.close()
 
-        return weights_np
+        return [layer.weight.detach().numpy() for layer in model.children()]
