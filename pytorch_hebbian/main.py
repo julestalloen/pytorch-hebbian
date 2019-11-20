@@ -26,8 +26,7 @@ def main_mnist():
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
 
     # Visualize some random images
-    data_iter = iter(data_loader)
-    images, labels = next(data_iter)
+    images, labels = next(iter(data_loader))
     show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
 
     epochs = 100
