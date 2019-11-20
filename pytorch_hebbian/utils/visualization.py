@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 
-def show_image(image):
+def show_image(image, title=None):
     np_img = image.numpy()
     plt.imshow(np.transpose(np_img, (1, 2, 0)))
+    if title is not None:
+        plt.title(title)
     plt.show()
 
 

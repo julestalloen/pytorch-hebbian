@@ -25,18 +25,20 @@ class HebbianEngine:
         logging.info('Received {} samples with shape {}.'.format(samples, input_shape))
 
         # TODO: support multiple layers
-        synapses = None
+        weights_np = None
         for layer in model.children():
             if type(layer) == torch.nn.Linear:
-                synapses = model[0].weight.detach().numpy()
-                logging.info("Updating layer '{}' with shape {}.".format(layer, synapses.shape))
+                weights = layer.weight
+                weights.data.normal_(mean=0.0, std=1.0)
+                weights_np = weights.detach().numpy()
+                logging.info("Updating layer '{}' with shape {}.".format(layer, weights_np.shape))
 
         # Visualization
         fig = None
         if self.visualize_weights:
             plt.ion()
             fig = plt.figure()
-            draw_weights_update(fig, synapses, input_shape)
+            draw_weights_update(fig, weights_np, input_shape)
 
         # Main loop
         for epoch in range(epochs):
@@ -45,16 +47,16 @@ class HebbianEngine:
             for i, data in enumerate(progress_bar):
                 inputs, labels = data
                 inputs = np.reshape(inputs.squeeze(), (inputs.shape[0], -1))
-                d_p = torch.from_numpy(self.learning_rule.update(inputs, synapses))
+                d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
                 self.optimizer.local_step(d_p)
 
             self.lr_scheduler.step()
 
             if self.visualize_weights:
-                draw_weights_update(fig, synapses, input_shape)
+                draw_weights_update(fig, weights_np, input_shape)
 
         # Wrap-up
         plt.ioff()
         plt.close()
 
-        return synapses
+        return weights_np

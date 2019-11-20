@@ -27,11 +27,11 @@ def main_mnist():
     # Visualize some random images
     data_iter = iter(data_loader)
     images, labels = next(data_iter)
-    show_image(torchvision.utils.make_grid(images))
+    show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
 
     epochs = 100
     learning_rule = KrotovsRule(delta=0.1, k=3, norm=2)
-    optimizer = Local(params=model.parameters(), lr=0.02)
+    optimizer = Local(params=model.parameters(), lr=0.04)
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     learning_engine = HebbianEngine(learning_rule=learning_rule,
                                     optimizer=optimizer,
