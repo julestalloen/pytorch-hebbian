@@ -10,6 +10,7 @@ from tqdm import tqdm
 from pytorch_hebbian.utils.visualization import draw_weights_update
 
 
+# noinspection PyUnresolvedReferences
 class HebbianEngine:
 
     def __init__(self, learning_rule, optimizer, lr_scheduler, visualize_weights: bool = False):
@@ -54,10 +55,12 @@ class HebbianEngine:
                 d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
                 self.optimizer.local_step(d_p)
 
-            self.lr_scheduler.step()
+                weights_np = list(model.children())[0].weight.detach().numpy()
 
-            if self.visualize_weights:
-                draw_weights_update(fig, weights_np, input_shape)
+                if self.visualize_weights:
+                    draw_weights_update(fig, weights_np, input_shape)
+
+            self.lr_scheduler.step()
 
         # Wrap-up
         plt.ioff()
