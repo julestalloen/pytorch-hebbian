@@ -11,7 +11,7 @@ from pytorch_hebbian.optimizers.local import Local
 
 
 def main_mnist():
-    input_size, hidden_units, output_size = 784, 100, 100
+    input_size, hidden_units, output_size = 32**2, 128, 100
     model = torch.nn.Sequential(
         torch.nn.Linear(input_size, hidden_units, bias=False),
         # torch.nn.ReLU(),
@@ -19,18 +19,20 @@ def main_mnist():
     )
 
     transform = transforms.Compose([
+        transforms.Grayscale(),
         transforms.ToTensor()
     ])
-    dataset = datasets.mnist.FashionMNIST(root='../datasets', download=True, transform=transform)
+    # dataset = datasets.mnist.FashionMNIST(root='../datasets', download=True, transform=transform)
     # dataset = datasets.mnist.MNIST(root='../datasets', download=True, transform=transform)
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+    dataset = datasets.cifar.CIFAR10(root='../datasets', download=True, transform=transform)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=1000, shuffle=True)
 
     # Visualize some random images
     images, labels = next(iter(data_loader))
     show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
 
-    epochs = 100
-    learning_rule = KrotovsRule(delta=0.2, k=2, norm=2)
+    epochs = 1000
+    learning_rule = KrotovsRule(delta=0.2, k=2, norm=4)
     optimizer = Local(params=model.parameters(), lr=0.02)
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     learning_engine = HebbianEngine(learning_rule=learning_rule,

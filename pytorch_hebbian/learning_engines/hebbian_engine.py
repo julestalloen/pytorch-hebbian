@@ -46,6 +46,10 @@ class HebbianEngine:
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(epoch + 1, epochs))
             for i, data in enumerate(progress_bar):
                 inputs, labels = data
+
+                labels = list(labels.numpy())
+                logging.debug('Label counts: {}.'.format({label: labels.count(label) for label in np.unique(labels)}))
+
                 inputs = np.reshape(inputs.squeeze(), (inputs.shape[0], -1))
                 d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
                 self.optimizer.local_step(d_p)
