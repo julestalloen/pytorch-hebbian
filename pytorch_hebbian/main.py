@@ -15,8 +15,8 @@ from pytorch_hebbian.optimizers.local import Local
 def main(params):
     model = torch.nn.Sequential(
         torch.nn.Linear(params['input_size'], params['hidden_units'], bias=False),
-        # torch.nn.ReLU(),
-        # torch.nn.Linear(hidden_units, output_size),
+        torch.nn.ReLU(),
+        torch.nn.Linear(params['hidden_units'], params['output_size']),
     )
 
     transform = transforms.Compose([
@@ -42,9 +42,10 @@ def main(params):
                                     lr_scheduler=lr_scheduler,
                                     metrics=metrics,
                                     visualize_weights=True)
-    weights = learning_engine.train(model=model, data_loader=data_loader, epochs=epochs)
+    model = learning_engine.train(model=model, data_loader=data_loader, epochs=epochs,
+                                  validate_every=1, checkpoint_every=10)
 
-    # draw_weights(weights, dataset[0].shape, 40, 40)
+    print(model)
 
 
 if __name__ == '__main__':
@@ -67,11 +68,11 @@ if __name__ == '__main__':
         'hidden_units': 100,
         'output_size': 10,
         'batch_size': 1000,
-        'epochs': 500,
+        'epochs': 1000,
         'delta': 0.2,
-        'k': 3,
-        'norm': 3,
-        'lr': 0.04
+        'k': 2,
+        'norm': 5,
+        'lr': 0.02
     }
 
     main(params_cifar)

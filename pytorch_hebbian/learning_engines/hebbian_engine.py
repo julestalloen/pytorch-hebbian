@@ -7,11 +7,12 @@ from torch.utils.data import DataLoader
 import numpy as np
 from tqdm import tqdm
 
+from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 from pytorch_hebbian.utils.visualization import draw_weights_update
 
 
 # noinspection PyUnresolvedReferences
-class HebbianEngine:
+class HebbianEngine(LearningEngine):
 
     def __init__(self, learning_rule, optimizer, lr_scheduler, metrics=None, visualize_weights: bool = False):
         self.learning_rule = learning_rule
@@ -30,7 +31,7 @@ class HebbianEngine:
 
         # TODO: support multiple layers
         weights_np = None
-        for layer in model.children():
+        for layer in list(model.children())[:-1]:
             if type(layer) == torch.nn.Linear:
                 weights = layer.weight
                 weights.data.normal_(mean=0.0, std=1.0)
@@ -65,14 +66,21 @@ class HebbianEngine:
 
             self.lr_scheduler.step()
 
+            if validate_every is not None:
+                if epoch % validate_every == 0:
+                    self.validate(model)
+
+            if checkpoint_every is not None:
+                if epoch % checkpoint_every == 0:
+                    self.checkpoint(model)
+
         # Wrap-up
         plt.ioff()
         plt.close()
 
-        return [layer.weight.detach().numpy() for layer in model.children()]
+        return model
 
-    def validate(self):
-        pass
-
-    def checkpoint(self):
-        pass
+    @staticmethod
+    def validate(model):
+        logging.info('Validating...')
+        # TODO: do gradient descent

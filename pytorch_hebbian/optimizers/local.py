@@ -16,8 +16,9 @@ class Local(Optimizer):
         if closure is not None:
             loss = closure()
 
+        # TODO: dirty fix
         for group in self.param_groups:
-            for p in group['params']:
+            for p in group['params'][:-2]:
                 p.data.add_(group['lr'] * d_p)
 
         # TODO: dirty fix
