@@ -13,15 +13,18 @@ from pytorch_hebbian.utils.visualization import draw_weights_update
 # noinspection PyUnresolvedReferences
 class HebbianEngine:
 
-    def __init__(self, learning_rule, optimizer, lr_scheduler, visualize_weights: bool = False):
+    def __init__(self, learning_rule, optimizer, lr_scheduler, metrics=None, visualize_weights: bool = False):
         self.learning_rule = learning_rule
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.visualize_weights = visualize_weights
 
-    def train(self, model: Module, data_loader: DataLoader, epochs: int):
+    def train(self, model: Module, data_loader: DataLoader, epochs: int,
+              validate_every: int = None, checkpoint_every: int = None):
         samples = len(data_loader.dataset)
-        input_shape = tuple(next(iter(data_loader))[0].size()[2:])
+        input_shape = tuple(next(iter(data_loader))[0].size())
+        _, d, h, w = input_shape
+        input_shape = (h, w, d)
 
         logging.info('Received {} samples with shape {}.'.format(samples, input_shape))
 
@@ -67,3 +70,9 @@ class HebbianEngine:
         plt.close()
 
         return [layer.weight.detach().numpy() for layer in model.children()]
+
+    def validate(self):
+        pass
+
+    def checkpoint(self):
+        pass

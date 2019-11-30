@@ -3,6 +3,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import torchvision
+import torch
 
 
 def show_image(image, title=None):
@@ -64,24 +66,53 @@ def draw_weights(synapses, shape, height, width):
 def draw_weights_update(fig, synapses, shape, height=None, width=None):
     plt.pause(0.001)
 
+    # TODO: support grids with non-square sizes
     if height is None or width is None:
         height = int(math.sqrt(synapses.shape[0]))
         width = height
 
-    dim_y, dim_x = shape
+    dim_y, dim_x, depth = shape
 
     yy = 0
-    data = np.zeros((dim_y * height, dim_x * width))
+    data = np.zeros((dim_y * height, dim_x * width, depth))
 
     for y in range(height):
         for x in range(width):
-            data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x] = synapses[yy, :].reshape(dim_y, dim_x)
+            data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x, :] = synapses[yy, :].reshape(dim_y, dim_x, depth)
             yy += 1
 
     plt.clf()
-    nc = np.amax(np.absolute(data))
-    im = plt.imshow(data, cmap='bwr', vmin=-nc, vmax=nc)
-    fig.colorbar(im, ticks=[np.amin(data), 0, np.amax(data)])
+
+    if depth > 1:
+        plt.imshow((data - np.amin(data)) / (np.amax(data) - np.amin(data)))
+    else:
+        nc = np.amax(np.absolute(data))
+        im = plt.imshow(data, cmap='bwr', vmin=-nc, vmax=nc)
+        fig.colorbar(im, ticks=[np.amin(data), 0, np.amax(data)])
+
+    plt.axis('off')
+    fig.canvas.draw()
+
+
+def draw_weights_update2(fig, synapses, shape):
+    plt.pause(0.001)
+
+    h, w, d = shape
+
+    synapses = np.array([torch.from_numpy(synapse.reshape(h, w, d)) for synapse in synapses])
+    print(synapses.shape)
+
+    data = torchvision.utils.make_grid(synapses)
+
+    plt.clf()
+
+    if d > 1:
+        plt.imshow((data - np.amin(data)) / (np.amax(data) - np.amin(data)))
+    else:
+        nc = np.amax(np.absolute(data))
+        im = plt.imshow(data, cmap='bwr', vmin=-nc, vmax=nc)
+        fig.colorbar(im, ticks=[np.amin(data), 0, np.amax(data)])
+
     plt.axis('off')
     fig.canvas.draw()
 
