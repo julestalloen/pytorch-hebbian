@@ -11,17 +11,15 @@ from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 from pytorch_hebbian.utils.visualization import draw_weights_update
 
 
-# noinspection PyUnresolvedReferences
 class HebbianEngine(LearningEngine):
 
-    def __init__(self, learning_rule, optimizer, lr_scheduler, metrics=None, visualize_weights: bool = False):
+    def __init__(self, learning_rule, optimizer, lr_scheduler, evaluator=None, visualize_weights: bool = False):
+        super().__init__(optimizer, lr_scheduler, evaluator)
         self.learning_rule = learning_rule
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
         self.visualize_weights = visualize_weights
 
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
-              validate_every: int = None, checkpoint_every: int = None):
+              eval_every: int = None, checkpoint_every: int = None):
         samples = len(data_loader.dataset)
         input_shape = tuple(next(iter(data_loader))[0].size())
         _, d, h, w = input_shape
@@ -33,6 +31,7 @@ class HebbianEngine(LearningEngine):
         weights_np = None
         for layer in list(model.children())[:-1]:
             if type(layer) == torch.nn.Linear:
+                # noinspection PyUnresolvedReferences
                 weights = layer.weight
                 weights.data.normal_(mean=0.0, std=1.0)
                 weights_np = weights.detach().numpy()
@@ -59,6 +58,7 @@ class HebbianEngine(LearningEngine):
                 d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
                 self.optimizer.local_step(d_p)
 
+                # noinspection PyUnresolvedReferences
                 weights_np = list(model.children())[0].weight.detach().numpy()
 
                 if self.visualize_weights:
@@ -66,9 +66,9 @@ class HebbianEngine(LearningEngine):
 
             self.lr_scheduler.step()
 
-            if validate_every is not None:
-                if epoch % validate_every == 0:
-                    self.validate(model)
+            if eval_every is not None:
+                if epoch % eval_every == 0:
+                    self.eval()
 
             if checkpoint_every is not None:
                 if epoch % checkpoint_every == 0:
@@ -79,8 +79,3 @@ class HebbianEngine(LearningEngine):
         plt.close()
 
         return model
-
-    @staticmethod
-    def validate(model):
-        logging.info('Validating...')
-        # TODO: do gradient descent

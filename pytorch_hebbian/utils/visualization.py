@@ -87,7 +87,7 @@ def draw_weights_update(fig, synapses, shape, height=None, width=None):
         plt.imshow((data - np.amin(data)) / (np.amax(data) - np.amin(data)))
     else:
         nc = np.amax(np.absolute(data))
-        im = plt.imshow(data, cmap='bwr', vmin=-nc, vmax=nc)
+        im = plt.imshow(np.squeeze(data), cmap='bwr', vmin=-nc, vmax=nc)
         fig.colorbar(im, ticks=[np.amin(data), 0, np.amax(data)])
 
     plt.axis('off')

@@ -1,14 +1,15 @@
 import logging
 
 import torch
-# import torchvision
+import torchvision
 from torchvision import datasets, transforms
 
 import config
-# from pytorch_hebbian.utils.visualization import show_image
+from pytorch_hebbian.utils.visualization import show_image
 from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.optimizers.local import Local
+from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
 
 
 # noinspection PyTypeChecker
@@ -24,26 +25,28 @@ def main(params):
         transforms.ToTensor()
     ])
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
+    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    # TODO: create train val split
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
+    val_loader = None
 
-    # Visualize some random images
-    # images, labels = next(iter(data_loader))
-    # show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
+    # Visualize some input samples
+    images, labels = next(iter(train_loader))
+    show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
 
     epochs = params['epochs']
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
     optimizer = Local(params=model.parameters(), lr=params['lr'])
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
-    metrics = []  # TODO
+    evaluator = HebbianEvaluator(model=model, data_loader=val_loader)
     learning_engine = HebbianEngine(learning_rule=learning_rule,
                                     optimizer=optimizer,
                                     lr_scheduler=lr_scheduler,
-                                    metrics=metrics,
+                                    evaluator=evaluator,
                                     visualize_weights=True)
-    model = learning_engine.train(model=model, data_loader=data_loader, epochs=epochs,
-                                  validate_every=1, checkpoint_every=10)
+    model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
+                                  eval_every=1, checkpoint_every=10)
 
     print(model)
 
@@ -53,14 +56,14 @@ if __name__ == '__main__':
 
     params_mnist = {
         'input_size': 28 ** 2,
-        'hidden_units': 100,
+        'hidden_units': 16,
         'output_size': 10,
         'batch_size': 100,
         'epochs': 100,
-        'delta': 0.2,
+        'delta': 0.3,
         'k': 2,
         'norm': 2,
-        'lr': 0.02
+        'lr': 0.04
     }
 
     params_cifar = {
@@ -75,4 +78,4 @@ if __name__ == '__main__':
         'lr': 0.02
     }
 
-    main(params_cifar)
+    main(params_mnist)
