@@ -54,14 +54,17 @@ class SupervisedEngine(LearningEngine):
             # TODO save or return best model
 
             # Evaluation
+            stats = None
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
                     stats = self.eval()
-                    print(stats)
 
             # Checkpoint saving
             if checkpoint_every is not None:
                 if vis_epoch % checkpoint_every == 0:
-                    self.checkpoint(model)
+                    if stats is not None:
+                        self.checkpoint(model, stats=stats)
+                    else:
+                        self.checkpoint(model)
 
         return model
