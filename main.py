@@ -48,7 +48,7 @@ def main(params):
                                     evaluator=evaluator,
                                     visualizer=visualizer)
     model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
-                                  eval_every=5, checkpoint_every=10)
+                                  eval_every=1, checkpoint_every=10)
 
     print(model)
 

@@ -104,6 +104,4 @@ venv.bak/
 .mypy_cache/
 
 .idea/
-data/coco/annotations/
-data/coco/cache
 datasets/
