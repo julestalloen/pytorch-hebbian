@@ -61,3 +61,5 @@ class GradEngine(LearningEngine):
             if checkpoint_every is not None:
                 if vis_epoch % checkpoint_every == 0:
                     self.checkpoint(model)
+
+        return model
