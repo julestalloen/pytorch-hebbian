@@ -4,7 +4,7 @@ import logging
 
 class LearningEngine(ABC):
 
-    def __init__(self, optimizer, lr_scheduler, evaluator):
+    def __init__(self, optimizer, lr_scheduler, evaluator=None):
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.evaluator = evaluator
@@ -14,10 +14,11 @@ class LearningEngine(ABC):
         pass
 
     def eval(self):
-        logging.info('Evaluating...')
         if self.evaluator is None:
-            logging.warning('No evaluator specified!')
+            logging.info('No evaluator specified.')
         else:
+            logging.info('Evaluating...')
+            self.evaluator.model.eval()
             self.evaluator.run()
 
     @staticmethod

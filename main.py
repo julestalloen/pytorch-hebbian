@@ -10,7 +10,7 @@ from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.optimizers.local import Local
 from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
-from pytorch_hebbian.visualizers.perceptron_visualizer import PerceptronVisualizer
+from pytorch_hebbian.visualizers.weight_visualizer import PerceptronVisualizer
 
 
 # noinspection PyTypeChecker
@@ -48,7 +48,7 @@ def main(params):
                                     evaluator=evaluator,
                                     visualizer=visualizer)
     model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
-                                  eval_every=2, checkpoint_every=10)
+                                  eval_every=5, checkpoint_every=10)
 
     print(model)
 

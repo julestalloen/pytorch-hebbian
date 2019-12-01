@@ -15,21 +15,26 @@ class PerceptronVisualizer(Visualizer):
         plt.pause(0.001)
         plt.clf()
 
-        # TODO: support grids with non-square sizes
+        # If no height or width is specified create the smallest fitting square grid
+        num_weights = weights.shape[0]
         if height is None or width is None:
-            height = int(math.sqrt(weights.shape[0]))
-            width = height
+            height = width = math.ceil(math.sqrt(num_weights))
 
+        # Put all perceptrons in a single array
         dim_y, dim_x, depth = shape
         data = np.zeros((dim_y * height, dim_x * width, depth))
 
         yy = 0
         for y in range(height):
             for x in range(width):
-                perceptron = weights[yy].reshape((depth, dim_y, dim_x)).transpose((1, 2, 0))
-                data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x, :] = perceptron
-                yy += 1
+                if yy < num_weights:
+                    perceptron = weights[yy].reshape((depth, dim_y, dim_x)).transpose((1, 2, 0))
+                    data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x, :] = perceptron
+                    yy += 1
+                else:
+                    break
 
+        # Depending on the amount of color channels, render the data
         if depth > 1:
             plt.imshow((data - np.amin(data)) / (np.amax(data) - np.amin(data)))
         else:
