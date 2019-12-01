@@ -18,6 +18,7 @@ class HebbianEngine(LearningEngine):
 
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
               eval_every: int = None, checkpoint_every: int = None):
+        # Inspect the data
         samples = len(data_loader.dataset)
         input_shape = tuple(next(iter(data_loader))[0].size())
         _, d, h, w = input_shape
@@ -25,6 +26,7 @@ class HebbianEngine(LearningEngine):
 
         logging.info('Received {} samples with shape {}.'.format(samples, input_shape))
 
+        # Iterate over the Linear layers of the model
         # TODO: support multiple layers
         weights_np = None
         for layer in list(model.children())[:-1]:
@@ -39,7 +41,7 @@ class HebbianEngine(LearningEngine):
         if self.visualizer is not None:
             self.visualizer.update(weights_np, input_shape)
 
-        # Main loop
+        # Training loop
         for epoch in range(epochs):
             vis_epoch = epoch + 1
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
@@ -62,10 +64,12 @@ class HebbianEngine(LearningEngine):
 
             self.lr_scheduler.step()
 
+            # Evaluation
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
                     self.eval()
 
+            # Checkpoint saving
             if checkpoint_every is not None:
                 if vis_epoch % checkpoint_every == 0:
                     self.checkpoint(model)
