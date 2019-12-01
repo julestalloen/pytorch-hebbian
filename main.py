@@ -10,7 +10,7 @@ from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.optimizers.local import Local
 from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
-from pytorch_hebbian.visualizers.weight_visualizer import PerceptronVisualizer
+from pytorch_hebbian.visualizers.weights_visualizer import PerceptronVisualizer
 
 
 # noinspection PyTypeChecker

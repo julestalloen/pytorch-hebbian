@@ -58,6 +58,7 @@ class SupervisedEngine(LearningEngine):
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
                     stats = self.eval()
+                    print(stats)
 
             # Checkpoint saving
             if checkpoint_every is not None:

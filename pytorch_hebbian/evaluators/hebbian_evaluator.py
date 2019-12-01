@@ -29,3 +29,5 @@ class HebbianEvaluator(Evaluator):
 
         # Evaluate
         # TODO
+
+        return {}
