@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 
 
-class GradEngine(LearningEngine):
+class SupervisedEngine(LearningEngine):
 
     def __init__(self, optimizer, lr_scheduler, criterion, evaluator=None):
         super().__init__(optimizer, lr_scheduler, evaluator)
