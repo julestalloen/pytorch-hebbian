@@ -52,10 +52,12 @@ class SupervisedEngine(LearningEngine):
             epoch_loss = running_loss / len(data_loader.dataset)
             logging.info('Train loss: {:.4f}'.format(epoch_loss))
 
+            # TODO save or return best model
+
             # Evaluation
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
-                    self.eval()
+                    stats = self.eval()
 
             # Checkpoint saving
             if checkpoint_every is not None:

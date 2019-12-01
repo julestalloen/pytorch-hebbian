@@ -8,5 +8,5 @@ class Evaluator(ABC):
         self.data_loader = data_loader
 
     @abstractmethod
-    def run(self):
+    def run(self) -> dict:
         pass

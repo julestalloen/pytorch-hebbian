@@ -8,4 +8,5 @@ class SupervisedEvaluator(Evaluator):
         self.metrics = metrics
 
     def run(self):
-        pass
+        # TODO
+        return {metric: 0 for metric in self.metrics}

@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 import logging
 
+import torch
+
+import config
+
 
 class LearningEngine(ABC):
 
@@ -15,7 +19,7 @@ class LearningEngine(ABC):
 
     def eval(self):
         if self.evaluator is None:
-            logging.info('No evaluator specified.')
+            logging.warning('No evaluator specified.')
         else:
             logging.info('Evaluating...')
             self.evaluator.model.eval()
@@ -24,4 +28,4 @@ class LearningEngine(ABC):
     @staticmethod
     def checkpoint(model):
         logging.info('Saving checkpoint...')
-        # TODO
+        torch.save(model.state_dict(), config.MODELS_DIR)

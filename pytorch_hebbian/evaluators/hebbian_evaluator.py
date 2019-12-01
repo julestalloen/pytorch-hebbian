@@ -1,7 +1,8 @@
 import torch
 
-from pytorch_hebbian.evaluators.evaluator import Evaluator
 from pytorch_hebbian.learning_engines.supervised_engine import SupervisedEngine
+from pytorch_hebbian.evaluators.evaluator import Evaluator
+from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
 
 
 class HebbianEvaluator(Evaluator):
@@ -11,7 +12,11 @@ class HebbianEvaluator(Evaluator):
         optimizer = torch.optim.Adam(model.parameters())
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
         criterion = torch.nn.CrossEntropyLoss()
-        self.supervised_engine = SupervisedEngine(optimizer=optimizer, lr_scheduler=lr_scheduler, criterion=criterion)
+        evaluator = SupervisedEvaluator(data_loader=data_loader, model=model)
+        self.supervised_engine = SupervisedEngine(optimizer=optimizer,
+                                                  lr_scheduler=lr_scheduler,
+                                                  criterion=criterion,
+                                                  evaluator=evaluator)
 
     def run(self):
         # Freeze all but final layer
