@@ -1,6 +1,5 @@
 import logging
 
-from matplotlib import pyplot as plt
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
@@ -8,15 +7,14 @@ import numpy as np
 from tqdm import tqdm
 
 from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
-from pytorch_hebbian.utils.visualization import draw_weights_update
 
 
 class HebbianEngine(LearningEngine):
 
-    def __init__(self, learning_rule, optimizer, lr_scheduler, evaluator=None, visualize_weights: bool = False):
+    def __init__(self, learning_rule, optimizer, lr_scheduler, evaluator=None, visualizer=None):
         super().__init__(optimizer, lr_scheduler, evaluator)
         self.learning_rule = learning_rule
-        self.visualize_weights = visualize_weights
+        self.visualizer = visualizer
 
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
               eval_every: int = None, checkpoint_every: int = None):
@@ -38,16 +36,14 @@ class HebbianEngine(LearningEngine):
                 logging.info("Updating layer '{}' with shape {}.".format(layer, weights_np.shape))
 
         # Visualization
-        fig = None
-        if self.visualize_weights:
-            plt.ion()
-            fig = plt.figure()
-            draw_weights_update(fig, weights_np, input_shape)
+        if self.visualizer is not None:
+            self.visualizer.update(weights_np, input_shape)
 
         # Main loop
         for epoch in range(epochs):
+            vis_epoch = epoch + 1
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
-            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(epoch + 1, epochs))
+            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
             for i, data in enumerate(progress_bar):
                 inputs, labels = data
 
@@ -61,21 +57,17 @@ class HebbianEngine(LearningEngine):
                 # noinspection PyUnresolvedReferences
                 weights_np = list(model.children())[0].weight.detach().numpy()
 
-                if self.visualize_weights:
-                    draw_weights_update(fig, weights_np, input_shape)
+                if self.visualizer is not None:
+                    self.visualizer.update(weights_np, input_shape)
 
             self.lr_scheduler.step()
 
             if eval_every is not None:
-                if epoch % eval_every == 0:
+                if vis_epoch % eval_every == 0:
                     self.eval()
 
             if checkpoint_every is not None:
-                if epoch % checkpoint_every == 0:
+                if vis_epoch % checkpoint_every == 0:
                     self.checkpoint(model)
-
-        # Wrap-up
-        plt.ioff()
-        plt.close()
 
         return model

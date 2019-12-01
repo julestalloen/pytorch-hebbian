@@ -10,6 +10,7 @@ from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.optimizers.local import Local
 from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
+from pytorch_hebbian.visualizers.perceptron_visualizer import PerceptronVisualizer
 
 
 # noinspection PyTypeChecker
@@ -25,8 +26,8 @@ def main(params):
         transforms.ToTensor()
     ])
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # TODO: create train val split
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
     val_loader = None
@@ -40,13 +41,14 @@ def main(params):
     optimizer = Local(params=model.parameters(), lr=params['lr'])
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     evaluator = HebbianEvaluator(model=model, data_loader=val_loader)
+    visualizer = PerceptronVisualizer()
     learning_engine = HebbianEngine(learning_rule=learning_rule,
                                     optimizer=optimizer,
                                     lr_scheduler=lr_scheduler,
                                     evaluator=evaluator,
-                                    visualize_weights=True)
+                                    visualizer=visualizer)
     model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
-                                  eval_every=1, checkpoint_every=10)
+                                  eval_every=2, checkpoint_every=10)
 
     print(model)
 
@@ -78,4 +80,4 @@ if __name__ == '__main__':
         'lr': 0.02
     }
 
-    main(params_mnist)
+    main(params_cifar)
