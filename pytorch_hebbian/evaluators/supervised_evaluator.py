@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 
 from pytorch_hebbian.evaluators.evaluator import Evaluator
 
@@ -17,8 +18,9 @@ class SupervisedEvaluator(Evaluator):
         running_loss = 0.0
         running_corrects = 0
 
-        for inputs, labels in self.data_loader:
-            inputs = inputs.to(self.device)
+        progress_bar = tqdm(self.data_loader, desc='Evaluating')
+        for inputs, labels in progress_bar:
+            inputs = inputs.to(self.device).view(inputs.size(0), -1)
             labels = labels.to(self.device)
 
             with torch.set_grad_enabled(False):

@@ -46,7 +46,7 @@ class HebbianEngine(LearningEngine):
             vis_epoch = epoch + 1
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
-            for i, data in enumerate(progress_bar):
+            for data in progress_bar:
                 inputs, labels = data
 
                 labels = list(labels.numpy())

@@ -25,9 +25,9 @@ def main(params):
         # transforms.Grayscale(),
         transforms.ToTensor()
     ])
+    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # TODO: create train val split
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
     val_loader = None
@@ -54,7 +54,7 @@ def main(params):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(module)s:%(message)s')
+    logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
 
     params_mnist = {
         'input_size': 28 ** 2,
@@ -80,4 +80,4 @@ if __name__ == '__main__':
         'lr': 0.02
     }
 
-    main(params_cifar)
+    main(params_mnist)

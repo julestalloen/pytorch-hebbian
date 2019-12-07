@@ -25,11 +25,10 @@ class LearningEngine(ABC):
             logging.warning('No evaluator specified.')
             return None
         else:
-            logging.info('Evaluating...')
             self.evaluator.model.eval()
             results = self.evaluator.run()
 
-            print('\n' + ', '.join(['{} = {}'.format(key, value) for key, value in results.items()]))
+            logging.info(', '.join(['{} = {:.4f}'.format(key, value) for key, value in results.items()]))
             return results
 
     @staticmethod

@@ -10,7 +10,7 @@ from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 
 class SupervisedEngine(LearningEngine):
 
-    def __init__(self, optimizer, lr_scheduler, criterion, evaluator=None):
+    def __init__(self, criterion, optimizer, lr_scheduler=None, evaluator=None):
         super().__init__(optimizer, lr_scheduler, evaluator)
         self.criterion = criterion
 
@@ -23,12 +23,13 @@ class SupervisedEngine(LearningEngine):
             vis_epoch = epoch + 1
             running_loss = 0.0
 
-            logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
+            # learning_rates = [param_group['lr'] for param_group in self.optimizer.param_groups]
+            # logging.info("Learning rate(s) = {}.".format(learning_rates))
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
-            for i, data in enumerate(progress_bar):
+            for data in progress_bar:
                 inputs, labels = data
-                inputs = inputs.to(self.device)
+                inputs = inputs.to(self.device).view(inputs.size(0), -1)
                 labels = labels.to(self.device)
 
                 # Zero the parameter gradients
@@ -46,7 +47,8 @@ class SupervisedEngine(LearningEngine):
                 # Statistics
                 running_loss += loss.item() * inputs.size(0)
 
-            self.lr_scheduler.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
 
             epoch_loss = running_loss / len(data_loader.dataset)
             logging.info('Train loss: {:.4f}'.format(epoch_loss))
