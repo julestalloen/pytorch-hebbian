@@ -7,16 +7,17 @@ from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
 
 class HebbianEvaluator(Evaluator):
 
-    def __init__(self, model, data_loader):
+    def __init__(self, model, data_loader, epochs=100):
         super().__init__(model, data_loader)
         optimizer = torch.optim.Adam(model.parameters())
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
         criterion = torch.nn.CrossEntropyLoss()
-        evaluator = SupervisedEvaluator(data_loader=data_loader, model=model, loss_criterion=criterion)
+        self.evaluator = SupervisedEvaluator(data_loader=data_loader, model=model, loss_criterion=criterion)
         self.supervised_engine = SupervisedEngine(optimizer=optimizer,
                                                   lr_scheduler=lr_scheduler,
                                                   criterion=criterion,
-                                                  evaluator=evaluator)
+                                                  evaluator=self.evaluator)
+        self.epochs = epochs
 
     def run(self):
         # Freeze all but final layer
@@ -24,10 +25,7 @@ class HebbianEvaluator(Evaluator):
             for param in layer.parameters():
                 param.requires_grad = False
 
-        # Train with gradient descent
-        # TODO
+        # Train with gradient descent and evaluate
+        self.supervised_engine.train(model=self.model, data_loader=self.data_loader, epochs=self.epochs, eval_every=10)
 
-        # Evaluate
-        # TODO
-
-        return {'test': 0.99}
+        return {'loss': min(self.evaluator.losses), 'acc': max(self.evaluator.accuracies)}

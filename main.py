@@ -5,7 +5,7 @@ import torchvision
 from torchvision import datasets, transforms
 
 import config
-from pytorch_hebbian.utils.visualization import show_image
+from pytorch_hebbian.utils.visualization import show_image, plot_learning_curve, plot_accuracy
 from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.optimizers.local import Local
@@ -13,7 +13,7 @@ from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
 from pytorch_hebbian.visualizers.weights_visualizer import PerceptronVisualizer
 
 
-# noinspection PyTypeChecker
+# noinspection PyTypeChecker,PyUnresolvedReferences
 def main(params):
     model = torch.nn.Sequential(
         torch.nn.Linear(params['input_size'], params['hidden_units'], bias=False),
@@ -22,15 +22,16 @@ def main(params):
     )
 
     transform = transforms.Compose([
-        # transforms.Grayscale(),
         transforms.ToTensor()
     ])
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    # TODO: create train val split
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=params['batch_size'], shuffle=True)
-    val_loader = None
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['batch_size'], shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['batch_size'], shuffle=True)
 
     # Visualize some input samples
     images, labels = next(iter(train_loader))
@@ -48,9 +49,13 @@ def main(params):
                                     evaluator=evaluator,
                                     visualizer=visualizer)
     model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
-                                  eval_every=1, checkpoint_every=10)
+                                  eval_every=10, checkpoint_every=10)
 
     print(model)
+
+    # Learning curves
+    plot_learning_curve(evaluator.supervised_engine.losses, evaluator.supervised_engine.evaluator.losses)
+    plot_accuracy(evaluator.supervised_engine.evaluator.accuracies)
 
 
 if __name__ == '__main__':
@@ -58,13 +63,13 @@ if __name__ == '__main__':
 
     params_mnist = {
         'input_size': 28 ** 2,
-        'hidden_units': 16,
+        'hidden_units': 100,
         'output_size': 10,
-        'batch_size': 100,
+        'batch_size': 1000,
         'epochs': 100,
-        'delta': 0.3,
-        'k': 2,
-        'norm': 2,
+        'delta': 0.4,
+        'k': 7,
+        'norm': 3,
         'lr': 0.04
     }
 

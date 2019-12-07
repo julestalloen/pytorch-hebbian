@@ -45,10 +45,9 @@ class HebbianEngine(LearningEngine):
         for epoch in range(epochs):
             vis_epoch = epoch + 1
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
-            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
-            for data in progress_bar:
-                inputs, labels = data
 
+            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
+            for inputs, labels in progress_bar:
                 labels = list(labels.numpy())
                 logging.debug('Label counts: {}.'.format({label: labels.count(label) for label in np.unique(labels)}))
 

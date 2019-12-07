@@ -13,6 +13,7 @@ class SupervisedEngine(LearningEngine):
     def __init__(self, criterion, optimizer, lr_scheduler=None, evaluator=None):
         super().__init__(optimizer, lr_scheduler, evaluator)
         self.criterion = criterion
+        self.losses = []
 
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
               eval_every: int = None, checkpoint_every: int = None):
@@ -27,8 +28,7 @@ class SupervisedEngine(LearningEngine):
             # logging.info("Learning rate(s) = {}.".format(learning_rates))
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
-            for data in progress_bar:
-                inputs, labels = data
+            for inputs, labels in progress_bar:
                 inputs = inputs.to(self.device).view(inputs.size(0), -1)
                 labels = labels.to(self.device)
 
@@ -51,6 +51,7 @@ class SupervisedEngine(LearningEngine):
                 self.lr_scheduler.step()
 
             epoch_loss = running_loss / len(data_loader.dataset)
+            self.losses.append(epoch_loss)
             logging.info('Train loss: {:.4f}'.format(epoch_loss))
 
             # TODO save or return best model

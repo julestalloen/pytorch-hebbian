@@ -6,13 +6,11 @@ from pytorch_hebbian.evaluators.evaluator import Evaluator
 
 class SupervisedEvaluator(Evaluator):
 
-    def __init__(self, model, data_loader, loss_criterion, metrics=None):
+    def __init__(self, model, data_loader, loss_criterion):
         super().__init__(model, data_loader)
         self.loss_criterion = loss_criterion
-        if metrics is None:
-            self.metrics = ['accuracy']
-        else:
-            self.metrics = metrics
+        self.accuracies = []
+        self.losses = []
 
     def run(self):
         running_loss = 0.0
@@ -32,9 +30,7 @@ class SupervisedEvaluator(Evaluator):
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(predictions == labels.data)
 
-        results = {
-            'loss': running_loss / len(self.data_loader.dataset),
-            'acc': running_corrects.double() / len(self.data_loader.dataset)
-        }
+        self.losses.append(running_loss / len(self.data_loader.dataset))
+        self.accuracies.append(running_corrects.double() / len(self.data_loader.dataset))
 
-        return results
+        return {'loss': self.losses[-1], 'acc': self.accuracies[-1]}

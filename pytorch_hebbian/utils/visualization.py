@@ -59,13 +59,26 @@ def draw_weights(synapses, shape, height, width):
     plt.show()
 
 
-def show_image_grid(patches):
-    plt.figure(figsize=(6, 5))
-    for i, patch in enumerate(patches[:100]):
-        plt.subplot(10, 10, i + 1)
-        plt.imshow(patch, interpolation='nearest', cmap='gray')
-        plt.xticks(())
-        plt.yticks(())
+def plot_learning_curve(train_losses, val_losses, epochs=None):
+    if epochs is None:
+        epochs = list(range(len(train_losses)))
 
-    plt.suptitle('Data')
+    plt.plot(epochs, train_losses, label='Train loss')
+    plt.plot(epochs, val_losses, label='Validation loss')
+    plt.title('Learning curves')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.show()
+
+
+def plot_accuracy(accuracies, epochs=None):
+    if epochs is None:
+        epochs = list(range(len(accuracies)))
+
+    plt.plot(epochs, accuracies, label='Validation accuracy')
+    plt.title('Accuracy curve')
+    plt.xlabel('epoch')
+    plt.ylabel('accuracy')
+    plt.legend()
     plt.show()
