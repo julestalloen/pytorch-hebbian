@@ -5,7 +5,7 @@ from .learning_rule import LearningRule
 
 class HebbsRule(LearningRule):
 
-    def __init__(self, c=0.5):
+    def __init__(self, c=0.1):
         super().__init__()
         self.c = c
 
