@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 
 import torch
 
@@ -9,7 +10,8 @@ class Evaluator(ABC):
         self.model = model
         self.data_loader = data_loader
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.history = []
+
+        logging.info('Device set to {}.'.format(self.device))
 
     @abstractmethod
     def run(self) -> dict:

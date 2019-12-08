@@ -25,6 +25,9 @@ class HebbianEvaluator(Evaluator):
             for param in layer.parameters():
                 param.requires_grad = False
 
+        # TODO: idea, reset weights for each run
+        #   https://discuss.pytorch.org/t/reset-model-weights/19180/2
+
         # Train with gradient descent and evaluate
         self.supervised_engine.train(model=self.model, data_loader=self.data_loader, epochs=self.epochs, eval_every=10)
 

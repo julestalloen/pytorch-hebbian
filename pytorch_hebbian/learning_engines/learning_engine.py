@@ -16,6 +16,8 @@ class LearningEngine(ABC):
         self.evaluator = evaluator
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+        logging.info('Device set to {}.'.format(self.device))
+
     @abstractmethod
     def train(self, *args):
         pass

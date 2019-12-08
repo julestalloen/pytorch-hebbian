@@ -41,8 +41,7 @@ def main(params):
     evaluator = SupervisedEvaluator(model=model, data_loader=val_loader, loss_criterion=criterion)
     learning_engine = SupervisedEngine(criterion=criterion, optimizer=optimizer, lr_scheduler=lr_scheduler,
                                        evaluator=evaluator)
-    model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs, eval_every=1,
-                                  checkpoint_every=10)
+    model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs, eval_every=1)
 
     # TODO: save model
     print(model)
@@ -60,7 +59,7 @@ if __name__ == '__main__':
         'hidden_units': 100,
         'output_size': 10,
         'batch_size': 64,
-        'epochs': 10,
+        'epochs': 100,
         'lr': 0.001
     }
 

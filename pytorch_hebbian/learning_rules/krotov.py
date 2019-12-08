@@ -31,6 +31,8 @@ class KrotovsRule(LearningRule):
         input_size = inputs[0].shape[0]
         inputs = np.transpose(inputs)
 
+        assert (self.k <= hid), "The amount of hidden units should be larger or equal to k!"
+
         sig = np.sign(synapses)
         tot_input = np.dot(sig * np.absolute(synapses) ** (self.norm - 1), inputs)
 
