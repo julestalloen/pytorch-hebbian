@@ -6,6 +6,7 @@ from torch.nn import Module
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import config
 from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 
 
@@ -53,16 +54,16 @@ class HebbianEngine(LearningEngine):
         # Training loop
         for epoch in range(epochs):
             vis_epoch = epoch + 1
+            epoch_step = epoch * len(data_loader)
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_last_lr()))
 
             if self.visualizer is not None:
-                self.visualizer.writer.add_scalar('learning_rate',
-                                                  self.lr_scheduler.get_last_lr()[0],
-                                                  epoch * len(data_loader))
+                self.visualizer.writer.add_scalar('learning_rate', self.lr_scheduler.get_last_lr()[0], epoch_step)
 
-            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
+            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs),
+                                bar_format=config.TQDM_BAR_FORMAT)
             for inputs, labels in progress_bar:
-                step = epoch * len(data_loader) + progress_bar.n
+                step = epoch_step + progress_bar.n
                 self._train_step(model, inputs, labels)
 
                 if self.visualizer is not None:
@@ -75,7 +76,6 @@ class HebbianEngine(LearningEngine):
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
                     stats = self.eval()
-                    # TODO: add hparams to tensorboard here
 
             # Checkpoint saving
             if checkpoint_every is not None:

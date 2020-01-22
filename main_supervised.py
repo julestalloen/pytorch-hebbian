@@ -1,17 +1,22 @@
 import logging
+import time
 
 import torch
 import torchvision
 from torchvision import datasets, transforms
 
 import config
-from pytorch_hebbian.utils.visualization import show_image, plot_learning_curve, plot_accuracy
-from pytorch_hebbian.learning_engines.supervised_engine import SupervisedEngine
 from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
+from pytorch_hebbian.learning_engines.supervised_engine import SupervisedEngine
+from pytorch_hebbian.utils.visualization import plot_learning_curve, plot_accuracy
+from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
-# noinspection PyTypeChecker,PyUnresolvedReferences
+# noinspection PyUnresolvedReferences
 def main(params):
+    run = 'supervised-{}'.format(time.strftime("%Y%m%d-%H%M%S"))
+    logging.info("Starting run '{}'.".format(run))
+
     model = torch.nn.Sequential(
         torch.nn.Linear(params['input_size'], params['hidden_units']),
         torch.nn.ReLU(),
@@ -24,15 +29,21 @@ def main(params):
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    train_size = int(0.8 * len(dataset))
+    train_size = int((1 - params['val_split']) * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['batch_size'], shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['batch_size'], shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=True)
 
-    # Visualize some input samples
+    # TensorBoard visualizer
+    visualizer = TensorBoardVisualizer(run=run)
+
+    # Visualize some input samples and the hyperparameters
     images, labels = next(iter(train_loader))
-    show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
+    visualizer.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
+    num_project = 128
+    visualizer.project(images[:num_project], labels[:num_project], params['input_size'])
+    visualizer.writer.add_hparams(params, {})
 
     epochs = params['epochs']
     criterion = torch.nn.CrossEntropyLoss()
@@ -58,7 +69,9 @@ if __name__ == '__main__':
         'input_size': 28 ** 2,
         'hidden_units': 100,
         'output_size': 10,
-        'batch_size': 64,
+        'train_batch_size': 64,
+        'val_batch_size': 64,
+        'val_split': 0.2,
         'epochs': 100,
         'lr': 0.001
     }

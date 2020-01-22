@@ -5,6 +5,7 @@ from torch.nn import Module
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import config
 from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 
 
@@ -45,7 +46,8 @@ class SupervisedEngine(LearningEngine):
             # learning_rates = [param_group['lr'] for param_group in self.optimizer.param_groups]
             # logging.info("Learning rate(s) = {}.".format(learning_rates))
 
-            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
+            progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs),
+                                bar_format=config.TQDM_BAR_FORMAT)
             for inputs, labels in progress_bar:
                 loss = self._train_step(model, inputs, labels)
 

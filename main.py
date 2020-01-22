@@ -14,7 +14,7 @@ from pytorch_hebbian.utils.visualization import plot_learning_curve, plot_accura
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
-# noinspection PyTypeChecker,PyUnresolvedReferences
+# noinspection PyUnresolvedReferences
 def main(params):
     run = 'hebbian-{}'.format(time.strftime("%Y%m%d-%H%M%S"))
     logging.info("Starting run '{}'.".format(run))
@@ -45,11 +45,12 @@ def main(params):
     visualizer.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
     num_project = 128
     visualizer.project(images[:num_project], labels[:num_project], params['input_size'])
-    # visualizer.writer.add_hparams(params, {})
+    visualizer.writer.add_hparams(params, {})
 
     epochs = params['epochs']
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
     optimizer = Local(params=model.parameters(), lr=params['lr'])
+    # noinspection PyTypeChecker
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     evaluator = HebbianEvaluator(model=model, data_loader=val_loader)
     learning_engine = HebbianEngine(learning_rule=learning_rule,
@@ -62,6 +63,8 @@ def main(params):
 
     print(model)
 
+    # TODO: log hparams with metrics to tensorboard
+
     # Learning curves
     plot_learning_curve(evaluator.supervised_engine.losses, evaluator.supervised_engine.evaluator.losses)
     plot_accuracy(evaluator.supervised_engine.evaluator.accuracies)
@@ -72,7 +75,7 @@ if __name__ == '__main__':
 
     params_mnist = {
         'input_size': 28 ** 2,
-        'hidden_units': 100,
+        'hidden_units': 400,
         'output_size': 10,
         'train_batch_size': 1000,
         'val_batch_size': 64,
