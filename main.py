@@ -1,4 +1,5 @@
 import logging
+import time
 
 import torch
 import torchvision
@@ -10,7 +11,7 @@ from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
 from pytorch_hebbian.learning_rules.krotov import KrotovsRule
 from pytorch_hebbian.optimizers.local import Local
 from pytorch_hebbian.utils.visualization import plot_learning_curve, plot_accuracy
-from pytorch_hebbian.visualizers import PerceptronVisualizer, TensorBoardVisualizer
+from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
 # noinspection PyTypeChecker,PyUnresolvedReferences
@@ -24,28 +25,28 @@ def main(params):
     transform = transforms.Compose([
         transforms.ToTensor()
     ])
-    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=True)
 
-    tb_visualizer = TensorBoardVisualizer()
+    visualizer = TensorBoardVisualizer(run='hebbian-{}'.format(time.strftime("%Y%m%d-%H%M%S")))
 
     # Visualize some input samples
     images, labels = next(iter(train_loader))
-    tb_visualizer.writer.add_image('initialization/some_input_samples', torchvision.utils.make_grid(images[:64]))
-    tb_visualizer.project(images[:100], labels[:100], params['input_size'])
+    visualizer.writer.add_image('initialization/some_input_samples', torchvision.utils.make_grid(images[:64]))
+    num_project = 128
+    visualizer.project(images[:num_project], labels[:num_project], params['input_size'])
 
     epochs = params['epochs']
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
     optimizer = Local(params=model.parameters(), lr=params['lr'])
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     evaluator = HebbianEvaluator(model=model, data_loader=val_loader)
-    visualizer = PerceptronVisualizer()
     learning_engine = HebbianEngine(learning_rule=learning_rule,
                                     optimizer=optimizer,
                                     lr_scheduler=lr_scheduler,
@@ -90,4 +91,4 @@ if __name__ == '__main__':
         'lr': 0.02
     }
 
-    main(params_mnist)
+    main(params_cifar)

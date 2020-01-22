@@ -1,5 +1,7 @@
-import numpy as np
+import math
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import colors
 
 
@@ -57,6 +59,28 @@ def draw_weights(synapses, shape, height, width):
                  fraction=.1,
                  ticks=[vmin, 0, vmax])
     plt.show()
+
+
+def weights_to_grid(weights, input_shape):
+    # If no height or width is specified create the smallest fitting square grid
+    num_weights = weights.shape[0]
+    height = width = math.ceil(math.sqrt(num_weights))
+
+    # Put all perceptrons in a single array
+    dim_y, dim_x, depth = input_shape
+    data = np.zeros((dim_y * height, dim_x * width, depth))
+
+    yy = 0
+    for y in range(height):
+        for x in range(width):
+            if yy < num_weights:
+                perceptron = weights[yy].reshape((depth, dim_y, dim_x)).transpose((1, 2, 0))
+                data[y * dim_y:(y + 1) * dim_y, x * dim_x:(x + 1) * dim_x, :] = perceptron
+                yy += 1
+            else:
+                break
+
+    return data
 
 
 def plot_learning_curve(train_losses, val_losses, epochs=None):

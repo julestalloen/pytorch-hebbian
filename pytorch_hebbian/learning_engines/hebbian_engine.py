@@ -48,12 +48,17 @@ class HebbianEngine(LearningEngine):
 
         # Visualization
         if self.visualizer is not None:
-            self.visualizer.update(weights_np, input_shape)
+            self.visualizer.update(weights_np, input_shape, 0)
 
         # Training loop
         for epoch in range(epochs):
             vis_epoch = epoch + 1
             logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_last_lr()))
+
+            if self.visualizer is not None:
+                self.visualizer.writer.add_scalar('learning_rate',
+                                                  self.lr_scheduler.get_last_lr()[0],
+                                                  epoch * len(data_loader))
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
             for inputs, labels in progress_bar:
@@ -63,7 +68,8 @@ class HebbianEngine(LearningEngine):
                 if self.visualizer is not None:
                     # noinspection PyUnresolvedReferences
                     weights_np = list(model.children())[0].weight.detach().numpy()
-                    self.visualizer.update(weights_np, input_shape)
+                    step = epoch * len(data_loader) + progress_bar.n
+                    self.visualizer.update(weights_np, input_shape, step)
 
             self.lr_scheduler.step()
 
