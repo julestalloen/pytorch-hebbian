@@ -37,18 +37,18 @@ class HebbianEngine(LearningEngine):
 
         # Iterate over the Linear layers of the model
         # TODO: support multiple layers
-        weights_np = None
+        current_layer = None
         for layer in list(model.children())[:-1]:
             if type(layer) == torch.nn.Linear:
-                # noinspection PyUnresolvedReferences
+                current_layer = layer
                 weights = layer.weight
                 weights.data.normal_(mean=0.0, std=1.0)
                 weights_np = weights.detach().numpy()
                 logging.info("Updating layer '{}' with shape {}.".format(layer, weights_np.shape))
 
-        # Visualization
+        # Initial visualization
         if self.visualizer is not None:
-            self.visualizer.update(weights_np, input_shape, 0)
+            self.visualizer.visualize_weights(current_layer.weight, input_shape, 0)
 
         # Training loop
         for epoch in range(epochs):
@@ -62,14 +62,11 @@ class HebbianEngine(LearningEngine):
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
             for inputs, labels in progress_bar:
+                step = epoch * len(data_loader) + progress_bar.n
                 self._train_step(model, inputs, labels)
 
-                # Visualization
                 if self.visualizer is not None:
-                    # noinspection PyUnresolvedReferences
-                    weights_np = list(model.children())[0].weight.detach().numpy()
-                    step = epoch * len(data_loader) + progress_bar.n
-                    self.visualizer.update(weights_np, input_shape, step)
+                    self.visualizer.visualize_weights(current_layer.weight, input_shape, step)
 
             self.lr_scheduler.step()
 
@@ -78,6 +75,7 @@ class HebbianEngine(LearningEngine):
             if eval_every is not None:
                 if vis_epoch % eval_every == 0:
                     stats = self.eval()
+                    # TODO: add hparams to tensorboard here
 
             # Checkpoint saving
             if checkpoint_every is not None:

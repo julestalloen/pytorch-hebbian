@@ -1,9 +1,11 @@
+import math
 import os
 
+import torch
+import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 import config
-from pytorch_hebbian.utils.visualization import weights_to_grid
 from pytorch_hebbian.visualizers.weights_visualizer import WeightsVisualizer
 
 
@@ -14,12 +16,15 @@ class TensorBoardVisualizer(WeightsVisualizer):
     """
     RUNS_DIR = os.path.join(config.TENSORBOARD_DIR, 'runs')
 
-    def __init__(self, run='hebbian'):
+    def __init__(self, run):
         self.writer = SummaryWriter(os.path.join(self.RUNS_DIR, run))
 
-    def update(self, weights, shape, step):
-        grid = weights_to_grid(weights, shape)
-        self.writer.add_image('weights', grid, step, dataformats='HWC')
+    def visualize_weights(self, weights, input_shape, step):
+        weights = torch.reshape(weights, (-1, *input_shape)).transpose(1, 3).transpose(2, 3)
+        num_weights = weights.shape[0]
+        nrow = math.ceil(math.sqrt(num_weights))
+        grid = torchvision.utils.make_grid(weights, nrow=nrow)
+        self.writer.add_image('weights', grid, step)
 
     def project(self, images, labels, input_size):
         features = images.view(-1, input_size)

@@ -10,7 +10,7 @@ class PyplotVisualizer(WeightsVisualizer):
     def __init__(self):
         self.fig = plt.figure()
 
-    def update(self, weights, shape, step):
+    def visualize_weights(self, weights, shape, step):
         plt.pause(0.001)
         plt.clf()
 
