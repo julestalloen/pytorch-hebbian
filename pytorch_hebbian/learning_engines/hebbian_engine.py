@@ -1,9 +1,9 @@
 import logging
 
+import numpy as np
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
-import numpy as np
 from tqdm import tqdm
 
 from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
@@ -15,6 +15,15 @@ class HebbianEngine(LearningEngine):
         super().__init__(optimizer, lr_scheduler, evaluator)
         self.learning_rule = learning_rule
         self.visualizer = visualizer
+
+    def _train_step(self, model, inputs, labels):
+        labels = list(labels.numpy())
+        logging.debug('Label counts: {}.'.format({label: labels.count(label) for label in np.unique(labels)}))
+
+        inputs = np.reshape(inputs.squeeze(), (inputs.shape[0], -1))
+        weights_np = list(model.children())[0].weight.detach().numpy()
+        d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
+        self.optimizer.local_step(d_p)
 
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
               eval_every: int = None, checkpoint_every: int = None):
@@ -44,21 +53,16 @@ class HebbianEngine(LearningEngine):
         # Training loop
         for epoch in range(epochs):
             vis_epoch = epoch + 1
-            logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_lr()))
+            logging.info("Learning rate(s) = {}.".format(self.lr_scheduler.get_last_lr()))
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
             for inputs, labels in progress_bar:
-                labels = list(labels.numpy())
-                logging.debug('Label counts: {}.'.format({label: labels.count(label) for label in np.unique(labels)}))
+                self._train_step(model, inputs, labels)
 
-                inputs = np.reshape(inputs.squeeze(), (inputs.shape[0], -1))
-                d_p = torch.from_numpy(self.learning_rule.update(inputs, weights_np))
-                self.optimizer.local_step(d_p)
-
-                # noinspection PyUnresolvedReferences
-                weights_np = list(model.children())[0].weight.detach().numpy()
-
+                # Visualization
                 if self.visualizer is not None:
+                    # noinspection PyUnresolvedReferences
+                    weights_np = list(model.children())[0].weight.detach().numpy()
                     self.visualizer.update(weights_np, input_shape)
 
             self.lr_scheduler.step()

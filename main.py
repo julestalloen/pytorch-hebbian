@@ -5,12 +5,12 @@ import torchvision
 from torchvision import datasets, transforms
 
 import config
-from pytorch_hebbian.utils.visualization import show_image, plot_learning_curve, plot_accuracy
-from pytorch_hebbian.learning_rules.krotov import KrotovsRule
-from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
-from pytorch_hebbian.optimizers.local import Local
 from pytorch_hebbian.evaluators.hebbian_evaluator import HebbianEvaluator
-from pytorch_hebbian.visualizers.weights_visualizer import PerceptronVisualizer
+from pytorch_hebbian.learning_engines.hebbian_engine import HebbianEngine
+from pytorch_hebbian.learning_rules.krotov import KrotovsRule
+from pytorch_hebbian.optimizers.local import Local
+from pytorch_hebbian.utils.visualization import plot_learning_curve, plot_accuracy
+from pytorch_hebbian.visualizers import PerceptronVisualizer, TensorBoardVisualizer
 
 
 # noinspection PyTypeChecker,PyUnresolvedReferences
@@ -30,12 +30,15 @@ def main(params):
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['batch_size'], shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['batch_size'], shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=True)
+
+    tb_visualizer = TensorBoardVisualizer()
 
     # Visualize some input samples
     images, labels = next(iter(train_loader))
-    show_image(torchvision.utils.make_grid(images[:64]), title='Some input samples')
+    tb_visualizer.writer.add_image('initialization/some_input_samples', torchvision.utils.make_grid(images[:64]))
+    tb_visualizer.project(images[:100], labels[:100], params['input_size'])
 
     epochs = params['epochs']
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
@@ -49,7 +52,7 @@ def main(params):
                                     evaluator=evaluator,
                                     visualizer=visualizer)
     model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs,
-                                  eval_every=10, checkpoint_every=10)
+                                  eval_every=50, checkpoint_every=None)
 
     print(model)
 
@@ -63,9 +66,10 @@ if __name__ == '__main__':
 
     params_mnist = {
         'input_size': 28 ** 2,
-        'hidden_units': 100,
+        'hidden_units': 400,
         'output_size': 10,
-        'batch_size': 1000,
+        'train_batch_size': 1000,
+        'val_batch_size': 64,
         'epochs': 100,
         'delta': 0.4,
         'k': 7,
@@ -77,7 +81,8 @@ if __name__ == '__main__':
         'input_size': 32 ** 2 * 3,
         'hidden_units': 100,
         'output_size': 10,
-        'batch_size': 1000,
+        'train_batch_size': 1000,
+        'val_batch_size': 64,
         'epochs': 1000,
         'delta': 0.2,
         'k': 2,

@@ -15,6 +15,24 @@ class SupervisedEngine(LearningEngine):
         self.criterion = criterion
         self.losses = []
 
+    def _train_step(self, model, inputs, labels):
+        inputs = inputs.to(self.device).view(inputs.size(0), -1)
+        labels = labels.to(self.device)
+
+        # Zero the parameter gradients
+        self.optimizer.zero_grad()
+
+        # Calculate the loss
+        outputs = model(inputs)
+        _, predictions = torch.max(outputs, 1)
+        loss = self.criterion(outputs, labels)
+
+        # Back propagation and optimize
+        loss.backward()
+        self.optimizer.step()
+
+        return loss
+
     def train(self, model: Module, data_loader: DataLoader, epochs: int,
               eval_every: int = None, checkpoint_every: int = None):
         model.train()
@@ -29,20 +47,7 @@ class SupervisedEngine(LearningEngine):
 
             progress_bar = tqdm(data_loader, desc='Epoch {}/{}'.format(vis_epoch, epochs))
             for inputs, labels in progress_bar:
-                inputs = inputs.to(self.device).view(inputs.size(0), -1)
-                labels = labels.to(self.device)
-
-                # Zero the parameter gradients
-                self.optimizer.zero_grad()
-
-                # Calculate the loss
-                outputs = model(inputs)
-                _, predictions = torch.max(outputs, 1)
-                loss = self.criterion(outputs, labels)
-
-                # Back propagation and optimize
-                loss.backward()
-                self.optimizer.step()
+                loss = self._train_step(model, inputs, labels)
 
                 # Statistics
                 running_loss += loss.item() * inputs.size(0)
