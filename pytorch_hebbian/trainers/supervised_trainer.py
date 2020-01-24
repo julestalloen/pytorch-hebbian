@@ -1,17 +1,18 @@
 import torch
 from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
-from ignite.metrics import Accuracy, Loss, RunningAverage
+from ignite.engine import Events, create_supervised_trainer
+from ignite.metrics import RunningAverage
 
 import config
 
 
 class SupervisedTrainer:
 
-    def __init__(self, model, optimizer, criterion, train_loader, val_loader, visualizer, device=None):
-        self.train_loader = train_loader
-        self.val_loader = val_loader
+    def __init__(self, model, optimizer, criterion, evaluator, visualizer, device=None):
+        self.evaluator = evaluator
         self.visualizer = visualizer
+        self.train_loader = None
+        self.val_loader = None
 
         if device is None:
             if torch.cuda.is_available():
@@ -19,24 +20,19 @@ class SupervisedTrainer:
             else:
                 device = 'cpu'
 
-        self.trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
-        # TODO: replace with custom supervised_evaluator class
-        self.evaluator = create_supervised_evaluator(model, metrics={
-            'accuracy': Accuracy(),
-            'loss': Loss(criterion)
-        }, device=device)
+        self.engine = create_supervised_trainer(model, optimizer, criterion, device=device)
 
-        RunningAverage(output_transform=lambda x: x).attach(self.trainer, 'loss')
+        RunningAverage(output_transform=lambda x: x).attach(self.engine, 'loss')
         self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
-        self.pbar.attach(self.trainer, metric_names='all')
+        self.pbar.attach(self.engine, metric_names='all')
 
         self._register_handlers()
 
     def _register_handlers(self):
-        @self.trainer.on(Events.EPOCH_COMPLETED)
+        @self.engine.on(Events.EPOCH_COMPLETED)
         def log_training_results(engine):
             self.evaluator.run(self.train_loader)
-            metrics = self.evaluator.state.metrics
+            metrics = self.evaluator.engine.state.metrics
             avg_accuracy = metrics['accuracy']
             avg_loss = metrics['loss']
 
@@ -47,10 +43,10 @@ class SupervisedTrainer:
             self.visualizer.writer.add_scalar("training/avg_loss", avg_loss, engine.state.epoch)
             self.visualizer.writer.add_scalar("training/avg_accuracy", avg_accuracy, engine.state.epoch)
 
-        @self.trainer.on(Events.EPOCH_COMPLETED)
+        @self.engine.on(Events.EPOCH_COMPLETED)
         def log_validation_results(engine):
             self.evaluator.run(self.val_loader)
-            metrics = self.evaluator.state.metrics
+            metrics = self.evaluator.engine.state.metrics
             avg_accuracy = metrics['accuracy']
             avg_loss = metrics['loss']
 
@@ -62,5 +58,7 @@ class SupervisedTrainer:
             self.visualizer.writer.add_scalar("validation/avg_loss", avg_loss, engine.state.epoch)
             self.visualizer.writer.add_scalar("validation/avg_accuracy", avg_accuracy, engine.state.epoch)
 
-    def run(self, epochs):
-        self.trainer.run(self.train_loader, max_epochs=epochs)
+    def run(self, train_loader, val_loader, epochs):
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.engine.run(train_loader, max_epochs=epochs)

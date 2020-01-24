@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 
 import config
 from model import Net
+from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
 from pytorch_hebbian.utils.data import split_dataset
 from pytorch_hebbian.utils.tensorboard import write_stats
@@ -36,9 +37,11 @@ def main(params):
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    trainer = SupervisedTrainer(model, optimizer, criterion, train_loader, val_loader, visualizer)
+    evaluator = SupervisedEvaluator(model=model, criterion=criterion)
+    trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, evaluator=evaluator,
+                                visualizer=visualizer)
 
-    trainer.run(params['epochs'])
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
 
 
 if __name__ == '__main__':

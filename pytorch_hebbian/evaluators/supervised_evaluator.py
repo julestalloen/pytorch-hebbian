@@ -1,37 +1,24 @@
 import torch
-from tqdm import tqdm
-
-import config
-from pytorch_hebbian.evaluators.evaluator import Evaluator
+from ignite.engine import create_supervised_evaluator
+from ignite.metrics import Accuracy, Loss
 
 
-class SupervisedEvaluator(Evaluator):
+class SupervisedEvaluator:
 
-    def __init__(self, model, data_loader, loss_criterion):
-        super().__init__(model, data_loader)
-        self.loss_criterion = loss_criterion
-        self.accuracies = []
-        self.losses = []
+    def __init__(self, model, criterion, metrics=None, device=None):
+        if device is None:
+            if torch.cuda.is_available():
+                device = 'cuda'
+            else:
+                device = 'cpu'
 
-    def run(self):
-        running_loss = 0.0
-        running_corrects = 0
+        if metrics is None:
+            metrics = {
+                'accuracy': Accuracy(),
+                'loss': Loss(criterion)
+            }
 
-        progress_bar = tqdm(self.data_loader, desc='Evaluating', bar_format=config.TQDM_BAR_FORMAT)
-        for inputs, labels in progress_bar:
-            inputs = inputs.to(self.device).view(inputs.size(0), -1)
-            labels = labels.to(self.device)
+        self.engine = create_supervised_evaluator(model, metrics=metrics, device=device)
 
-            with torch.set_grad_enabled(False):
-                outputs = self.model(inputs)
-                _, predictions = torch.max(outputs, 1)
-
-                # Statistics
-                loss = self.loss_criterion(outputs, labels)
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(predictions == labels.data)
-
-        self.losses.append(running_loss / len(self.data_loader.dataset))
-        self.accuracies.append(running_corrects.double() / len(self.data_loader.dataset))
-
-        return {'loss': self.losses[-1], 'acc': self.accuracies[-1]}
+    def run(self, val_loader):
+        self.engine.run(val_loader)
