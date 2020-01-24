@@ -10,11 +10,12 @@ import config
 
 class SupervisedTrainer:
 
-    def __init__(self, model, optimizer, criterion, evaluator, visualizer, device=None):
+    def __init__(self, model, optimizer, criterion, evaluator, visualizer=None, device=None):
         self.evaluator = evaluator
         self.visualizer = visualizer
         self.train_loader = None
         self.val_loader = None
+        self.eval_every = None
 
         if device is None:
             if torch.cuda.is_available():
@@ -34,34 +35,34 @@ class SupervisedTrainer:
     def _register_handlers(self):
         @self.engine.on(Events.EPOCH_COMPLETED)
         def log_training_results(engine):
-            self.evaluator.run(self.train_loader)
-            metrics = self.evaluator.engine.state.metrics
-            avg_accuracy = metrics['accuracy']
-            avg_loss = metrics['loss']
+            if engine.state.epoch % self.eval_every == 0:
+                self.evaluator.run(self.train_loader)
+                metrics = self.evaluator.engine.state.metrics
+                avg_accuracy = metrics['accuracy']
+                avg_loss = metrics['loss']
 
-            self.pbar.log_message(
-                "Training Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}"
-                    .format(engine.state.epoch, avg_accuracy, avg_loss)
-            )
-            self.visualizer.writer.add_scalar("training/avg_loss", avg_loss, engine.state.epoch)
-            self.visualizer.writer.add_scalar("training/avg_accuracy", avg_accuracy, engine.state.epoch)
+                self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                if self.visualizer is not None:
+                    self.visualizer.writer.add_scalar("training/avg_loss", avg_loss, engine.state.epoch)
+                    self.visualizer.writer.add_scalar("training/avg_accuracy", avg_accuracy, engine.state.epoch)
 
         @self.engine.on(Events.EPOCH_COMPLETED)
         def log_validation_results(engine):
-            self.evaluator.run(self.val_loader)
-            metrics = self.evaluator.engine.state.metrics
-            avg_accuracy = metrics['accuracy']
-            avg_loss = metrics['loss']
+            if engine.state.epoch % self.eval_every == 0:
+                self.evaluator.run(self.val_loader)
+                metrics = self.evaluator.engine.state.metrics
+                avg_accuracy = metrics['accuracy']
+                avg_loss = metrics['loss']
 
-            self.pbar.log_message(
-                "Validation Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}"
-                    .format(engine.state.epoch, avg_accuracy, avg_loss)
-            )
-            self.pbar.n = self.pbar.last_print_n = 0
-            self.visualizer.writer.add_scalar("validation/avg_loss", avg_loss, engine.state.epoch)
-            self.visualizer.writer.add_scalar("validation/avg_accuracy", avg_accuracy, engine.state.epoch)
+                self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                if self.visualizer is not None:
+                    self.visualizer.writer.add_scalar("validation/avg_loss", avg_loss, engine.state.epoch)
+                    self.visualizer.writer.add_scalar("validation/avg_accuracy", avg_accuracy, engine.state.epoch)
 
-    def run(self, train_loader, val_loader, epochs):
+                self.pbar.n = self.pbar.last_print_n = 0
+
+    def run(self, train_loader, val_loader, epochs, eval_every=1):
         self.train_loader = train_loader
         self.val_loader = val_loader
+        self.eval_every = eval_every
         self.engine.run(train_loader, max_epochs=epochs)

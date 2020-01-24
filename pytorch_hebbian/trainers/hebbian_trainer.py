@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import torch
 from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.handlers.param_scheduler import LRScheduler
 from ignite.engine import Engine, Events
 
 import config
@@ -16,7 +17,7 @@ class HebbianTrainer:
         self.visualizer = visualizer
         self.train_loader = None
         self.val_loader = None
-        # TODO: use learning rate scheduler
+        self.eval_every = None
 
         if device is None:
             if torch.cuda.is_available():
@@ -36,6 +37,9 @@ class HebbianTrainer:
                 logging.info("Updating layer '{}' with shape {}.".format(layer, weights_np.shape))
 
         self.engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
+
+        self.scheduler = LRScheduler(lr_scheduler)
+        self.engine.add_event_handler(Events.EPOCH_COMPLETED, self.scheduler)
 
         self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
         self.pbar.attach(self.engine)
@@ -60,12 +64,27 @@ class HebbianTrainer:
         return Engine(_update)
 
     def _register_handlers(self):
+        @self.engine.on(Events.EPOCH_STARTED)
+        def log_validation_results(engine):
+            logging.info('Learning rate: {}.'.format(round(self.scheduler.get_param(), 6)))
+            self.visualizer.writer.add_scalar('learning_rate', self.scheduler.get_param(), engine.state.epoch - 1)
+
         @self.engine.on(Events.EPOCH_COMPLETED)
         def log_validation_results(engine):
-            pass
-            # TODO
+            if engine.state.epoch % self.eval_every == 0:
+                self.evaluator.run(self.train_loader, self.val_loader)
+                metrics = self.evaluator.metrics
+                avg_accuracy = metrics['accuracy']
+                avg_loss = metrics['loss']
 
-    def run(self, train_loader, val_loader, epochs):
+                self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                self.visualizer.writer.add_scalar("validation/avg_loss", avg_loss, engine.state.epoch)
+                self.visualizer.writer.add_scalar("validation/avg_accuracy", avg_accuracy, engine.state.epoch)
+
+                self.pbar.n = self.pbar.last_print_n = 0
+
+    def run(self, train_loader, val_loader, epochs, eval_every=1):
         self.train_loader = train_loader
         self.val_loader = val_loader
+        self.eval_every = eval_every
         self.engine.run(train_loader, max_epochs=epochs)

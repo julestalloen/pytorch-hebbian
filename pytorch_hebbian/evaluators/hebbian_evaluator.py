@@ -1,30 +1,27 @@
 import torch
 
+from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
+from pytorch_hebbian.trainers import SupervisedTrainer
+
 
 class HebbianEvaluator:
 
-    def __init__(self, model, data_loader, epochs=100):
+    def __init__(self, model, epochs=100):
         self.model = model
-        self.data_loader = data_loader
         self.epochs = epochs
+        self.metrics = {}
 
-    def run(self):
-        optimizer = torch.optim.Adam(self.model.parameters())
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+    def run(self, train_loader, val_loader):
+        # Freeze all but final layer
+        for layer in list(self.model.children())[:-1]:
+            for param in layer.parameters():
+                param.requires_grad = False
+
         criterion = torch.nn.CrossEntropyLoss()
-        # TODO
-        # evaluator = SupervisedEvaluator(data_loader=self.data_loader, model=self.model, loss_criterion=criterion)
-        # supervised_engine = SupervisedEngine(optimizer=optimizer,
-        #                                      lr_scheduler=lr_scheduler,
-        #                                      criterion=criterion,
-        #                                      evaluator=evaluator)
-        #
-        # # Freeze all but final layer
-        # for layer in list(self.model.children())[:-1]:
-        #     for param in layer.parameters():
-        #         param.requires_grad = False
-        #
-        # # Train with gradient descent and evaluate
-        # supervised_engine.train(model=self.model, data_loader=self.data_loader, epochs=self.epochs, eval_every=10)
-        #
-        # return {'loss': min(evaluator.losses), 'acc': max(evaluator.accuracies)}
+        optimizer = torch.optim.Adam(params=self.model.parameters())
+        evaluator = SupervisedEvaluator(model=self.model, criterion=criterion)
+        trainer = SupervisedTrainer(model=self.model, optimizer=optimizer, criterion=criterion, evaluator=evaluator)
+
+        trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs, eval_every=10)
+
+        self.metrics = evaluator.engine.state.metrics

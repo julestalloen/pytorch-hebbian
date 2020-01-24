@@ -41,7 +41,7 @@ def main(params):
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, evaluator=evaluator,
                                 visualizer=visualizer)
 
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2)
 
 
 if __name__ == '__main__':
