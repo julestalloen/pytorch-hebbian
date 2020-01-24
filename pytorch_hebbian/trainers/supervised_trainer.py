@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, create_supervised_trainer
@@ -19,6 +21,7 @@ class SupervisedTrainer:
                 device = 'cuda'
             else:
                 device = 'cpu'
+        logging.info("Device set to '{}'.".format(device))
 
         self.engine = create_supervised_trainer(model, optimizer, criterion, device=device)
 
