@@ -1,2 +1,2 @@
 # PyTorch Hebbian
-Lightweight framework for hebbian learning based on PyTorch Ignite.
+Lightweight framework for Hebbian learning based on PyTorch Ignite.
