@@ -49,7 +49,7 @@ def main(params):
                              lr_scheduler=lr_scheduler,
                              evaluator=evaluator,
                              visualizer=visualizer)
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=10)
 
 
 if __name__ == '__main__':

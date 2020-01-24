@@ -18,6 +18,8 @@ class HebbianTrainer:
         self.train_loader = None
         self.val_loader = None
         self.eval_every = None
+        self.vis_weights_every = None
+        self.input_shape = None
 
         if device is None:
             if torch.cuda.is_available():
@@ -33,8 +35,7 @@ class HebbianTrainer:
                 self.layer = layer
                 weights = layer.weight
                 weights.data.normal_(mean=0.0, std=1.0)
-                weights_np = weights.detach().numpy()
-                logging.info("Updating layer '{}' with shape {}.".format(layer, weights_np.shape))
+                logging.info("Updating layer '{}' with shape {}.".format(layer, weights.shape))
 
         self.engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
 
@@ -66,7 +67,7 @@ class HebbianTrainer:
     def _register_handlers(self):
         @self.engine.on(Events.EPOCH_STARTED)
         def log_validation_results(engine):
-            logging.info('Learning rate: {}.'.format(round(self.scheduler.get_param(), 6)))
+            logging.debug('Learning rate: {}.'.format(round(self.scheduler.get_param(), 6)))
             self.visualizer.writer.add_scalar('learning_rate', self.scheduler.get_param(), engine.state.epoch - 1)
 
         @self.engine.on(Events.EPOCH_COMPLETED)
@@ -83,8 +84,15 @@ class HebbianTrainer:
 
                 self.pbar.n = self.pbar.last_print_n = 0
 
-    def run(self, train_loader, val_loader, epochs, eval_every=1):
+        @self.engine.on(Events.ITERATION_COMPLETED)
+        def visualize_weights(engine):
+            if engine.state.iteration % self.vis_weights_every == 0:
+                self.visualizer.visualize_weights(self.layer.weight, self.input_shape, engine.state.epoch)
+
+    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=1):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
+        self.vis_weights_every = vis_weights_every
+        self.input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
         self.engine.run(train_loader, max_epochs=epochs)

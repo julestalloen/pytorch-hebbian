@@ -2,6 +2,8 @@ import logging
 import time
 
 import torch
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -40,6 +42,11 @@ def main(params):
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, evaluator=evaluator,
                                 visualizer=visualizer)
+
+    # Early stopping
+    handler = EarlyStopping(patience=5, score_function=lambda engine: -engine.state.metrics['loss'],
+                            trainer=trainer.engine, cumulative_delta=True)
+    evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2)
 

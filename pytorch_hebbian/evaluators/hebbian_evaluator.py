@@ -1,4 +1,6 @@
 import torch
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
 
 from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
@@ -22,6 +24,11 @@ class HebbianEvaluator:
         evaluator = SupervisedEvaluator(model=self.model, criterion=criterion)
         trainer = SupervisedTrainer(model=self.model, optimizer=optimizer, criterion=criterion, evaluator=evaluator)
 
-        trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs, eval_every=10)
+        # Early stopping
+        handler = EarlyStopping(patience=3, score_function=lambda engine: -engine.state.metrics['loss'],
+                                trainer=trainer.engine, cumulative_delta=True)
+        evaluator.engine.add_event_handler(Events.COMPLETED, handler)
+
+        trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs, eval_every=5)
 
         self.metrics = evaluator.engine.state.metrics

@@ -20,7 +20,7 @@ class TensorBoardVisualizer(WeightsVisualizer):
         self.writer = SummaryWriter(os.path.join(self.RUNS_DIR, run))
 
     def visualize_weights(self, weights, input_shape, step):
-        weights = torch.reshape(weights, (-1, *input_shape)).transpose(1, 3).transpose(2, 3)
+        weights = torch.reshape(weights, (-1, *input_shape))
         num_weights = weights.shape[0]
         nrow = math.ceil(math.sqrt(num_weights))
         grid = torchvision.utils.make_grid(weights, nrow=nrow)
