@@ -1,12 +1,12 @@
 import logging
 
 import torch
+from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 from torch.nn import Module
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import config
-from pytorch_hebbian.learning_engines.learning_engine import LearningEngine
 
 
 class SupervisedEngine(LearningEngine):

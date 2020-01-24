@@ -2,68 +2,48 @@ import logging
 import time
 
 import torch
-import torchvision
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import config
-from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
-from pytorch_hebbian.learning_engines.supervised_engine import SupervisedEngine
-from pytorch_hebbian.utils.visualization import plot_learning_curve, plot_accuracy
+from model import Net
+from pytorch_hebbian.trainers import SupervisedTrainer
+from pytorch_hebbian.utils.data import split_dataset
+from pytorch_hebbian.utils.tensorboard import write_stats
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
-# noinspection PyUnresolvedReferences
 def main(params):
     run = 'supervised-{}'.format(time.strftime("%Y%m%d-%H%M%S"))
     logging.info("Starting run '{}'.".format(run))
 
-    model = torch.nn.Sequential(
-        torch.nn.Linear(params['input_size'], params['hidden_units']),
-        torch.nn.ReLU(),
-        torch.nn.Linear(params['hidden_units'], params['output_size']),
-    )
+    model = Net([params['input_size'], params['hidden_units'], params['output_size']])
 
     transform = transforms.Compose([
-        transforms.ToTensor()
+        transforms.ToTensor(),
     ])
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    train_size = int((1 - params['val_split']) * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=True)
+    train_dataset, val_dataset = split_dataset(dataset, val_split=params['val_split'])
+    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
 
     # TensorBoard visualizer
     visualizer = TensorBoardVisualizer(run=run)
+    # Write some basis stats
+    write_stats(visualizer, model, train_loader, params)
 
-    # Visualize some input samples and the hyperparameters
-    images, labels = next(iter(train_loader))
-    visualizer.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
-    num_project = 128
-    visualizer.project(images[:num_project], labels[:num_project], params['input_size'])
-    visualizer.writer.add_hparams(params, {})
-
-    epochs = params['epochs']
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
-    evaluator = SupervisedEvaluator(model=model, data_loader=val_loader, loss_criterion=criterion)
-    learning_engine = SupervisedEngine(criterion=criterion, optimizer=optimizer, lr_scheduler=lr_scheduler,
-                                       evaluator=evaluator)
-    model = learning_engine.train(model=model, data_loader=train_loader, epochs=epochs, eval_every=1)
+    trainer = SupervisedTrainer(model, optimizer, criterion, train_loader, val_loader, visualizer)
 
-    # TODO: save model
-    print(model)
-
-    # Learning curves
-    plot_learning_curve(learning_engine.losses, evaluator.losses)
-    plot_accuracy(evaluator.accuracies)
+    trainer.run(params['epochs'])
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
+    logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
         'input_size': 28 ** 2,

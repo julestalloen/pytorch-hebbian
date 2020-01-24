@@ -32,3 +32,6 @@ class TensorBoardVisualizer(WeightsVisualizer):
                                   metadata=labels,
                                   label_img=images)
         self.writer.close()
+
+    def __del__(self):
+        self.writer.close()
