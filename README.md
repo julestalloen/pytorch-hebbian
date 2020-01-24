@@ -1,2 +1,2 @@
-# local-learning-rules
-Evaluation of local learning rules in neural networks
+# PyTorch Hebbian
+Lightweight framework for hebbian learning based on PyTorch Ignite.
