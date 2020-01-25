@@ -13,9 +13,17 @@ class HebbianEvaluator:
     def __init__(self, model, epochs=100):
         self.model = model
         self.epochs = epochs
+        self.early_stopping_patience = 5
+        self.supervised_eval_every = 5
+        self.metrics = None
+        self._init_metrics()
+
+    def _init_metrics(self):
         self.metrics = {'loss': float('inf')}
 
     def run(self, train_loader, val_loader):
+        self._init_metrics()
+
         # Freeze all but final layer
         for layer in list(self.model.children())[:-1]:
             for param in layer.parameters():
@@ -38,8 +46,10 @@ class HebbianEvaluator:
                 logging.info("New best loss: {:.4f}.".format(loss))
 
         # Early stopping
-        handler = EarlyStopping(patience=4, score_function=lambda engine: -engine.state.metrics['loss'],
+        handler = EarlyStopping(patience=self.early_stopping_patience,
+                                score_function=lambda engine: -engine.state.metrics['loss'],
                                 trainer=trainer.engine, cumulative_delta=True)
         evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
-        trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs, eval_every=5)
+        trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
+                    eval_every=self.supervised_eval_every)

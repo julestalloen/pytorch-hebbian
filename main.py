@@ -1,5 +1,8 @@
+import json
 import logging
+import os
 import time
+from argparse import ArgumentParser
 
 import torch
 from torch.utils.data import DataLoader
@@ -49,39 +52,35 @@ def main(params):
                              lr_scheduler=lr_scheduler,
                              evaluator=evaluator,
                              visualizer=visualizer)
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=10)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=20)
+
+    # Save the params with metrics
+    visualizer.writer.add_hparams(params, evaluator.metrics)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
-    params_mnist = {
-        'input_size': 28 ** 2,
-        'hidden_units': 400,
-        'output_size': 10,
-        'train_batch_size': 1000,
-        'val_batch_size': 64,
-        'val_split': 0.2,
-        'epochs': 100,
-        'delta': 0.4,
-        'k': 7,
-        'norm': 3,
-        'lr': 0.04
-    }
+    # TODO: WIP
+    parser = ArgumentParser()
+    parser.add_argument('--json', type=str,
+                        help='use a preset json file to specify parameters')
+    # parser.add_argument('--batch_size', type=int, default=64,
+    #                     help='input batch size for training (default: 64)')
+    # parser.add_argument('--val_batch_size', type=int, default=1000,
+    #                     help='input batch size for validation (default: 1000)')
+    # parser.add_argument('--epochs', type=int, default=10,
+    #                     help='number of epochs to train (default: 10)')
+    # parser.add_argument('--lr', type=float, default=0.01,
+    #                     help='learning rate (default: 0.01)')
+    # parser.add_argument("--log_dir", type=str, default="tensorboard_logs",
+    #                     help="log directory for Tensorboard log output")
+    args = parser.parse_args()
 
-    params_cifar = {
-        'input_size': 32 ** 2 * 3,
-        'hidden_units': 100,
-        'output_size': 10,
-        'train_batch_size': 1000,
-        'val_batch_size': 64,
-        'val_split': 0.2,
-        'epochs': 1000,
-        'delta': 0.2,
-        'k': 2,
-        'norm': 5,
-        'lr': 0.02
-    }
+    if args.json is not None:
+        with open(os.path.join(config.PARAMS_DIR, args.json)) as f:
+            params_ = json.load(f)['params']
+        logging.info("Loaded parameters from '{}'.".format(args.json))
 
-    main(params_mnist)
+    main(params_)

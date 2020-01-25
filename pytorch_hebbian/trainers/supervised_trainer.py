@@ -67,5 +67,7 @@ class SupervisedTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
+        logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
+                                                                              len(val_loader.dataset)))
         logging.info('Evaluating every {} epoch(s).'.format(self.eval_every))
         self.engine.run(train_loader, max_epochs=epochs)
