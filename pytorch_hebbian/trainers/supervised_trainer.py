@@ -6,12 +6,14 @@ from ignite.engine import Events, create_supervised_trainer
 from ignite.metrics import RunningAverage
 
 import config
+from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
 
 
 class SupervisedTrainer:
 
     def __init__(self, model, optimizer, criterion, evaluator, visualizer=None, device=None):
         self.evaluator = evaluator
+        self.train_evaluator = SupervisedEvaluator(model, criterion)
         self.visualizer = visualizer
         self.train_loader = None
         self.val_loader = None
@@ -36,8 +38,8 @@ class SupervisedTrainer:
         @self.engine.on(Events.EPOCH_COMPLETED)
         def log_training_results(engine):
             if engine.state.epoch % self.eval_every == 0:
-                self.evaluator.run(self.train_loader)
-                metrics = self.evaluator.engine.state.metrics
+                self.train_evaluator.run(self.train_loader)
+                metrics = self.train_evaluator.engine.state.metrics
                 avg_accuracy = metrics['accuracy']
                 avg_loss = metrics['loss']
 
@@ -65,4 +67,5 @@ class SupervisedTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
+        logging.info('Evaluating every {} epoch(s).'.format(self.eval_every))
         self.engine.run(train_loader, max_epochs=epochs)

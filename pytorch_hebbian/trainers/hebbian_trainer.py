@@ -66,7 +66,7 @@ class HebbianTrainer:
 
     def _register_handlers(self):
         @self.engine.on(Events.EPOCH_STARTED)
-        def log_validation_results(engine):
+        def log_learning_rate(engine):
             logging.debug('Learning rate: {}.'.format(round(self.scheduler.get_param(), 6)))
             self.visualizer.writer.add_scalar('learning_rate', self.scheduler.get_param(), engine.state.epoch - 1)
 
@@ -95,4 +95,5 @@ class HebbianTrainer:
         self.eval_every = eval_every
         self.vis_weights_every = vis_weights_every
         self.input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
+        logging.info('Evaluating every {} epoch(s).'.format(self.eval_every))
         self.engine.run(train_loader, max_epochs=epochs)

@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping
@@ -11,7 +13,7 @@ class HebbianEvaluator:
     def __init__(self, model, epochs=100):
         self.model = model
         self.epochs = epochs
-        self.metrics = {}
+        self.metrics = {'loss': float('inf')}
 
     def run(self, train_loader, val_loader):
         # Freeze all but final layer
@@ -24,11 +26,20 @@ class HebbianEvaluator:
         evaluator = SupervisedEvaluator(model=self.model, criterion=criterion)
         trainer = SupervisedTrainer(model=self.model, optimizer=optimizer, criterion=criterion, evaluator=evaluator)
 
+        # Metric history saving
+        @evaluator.engine.on(Events.COMPLETED)
+        def save_best_metrics(engine):
+            loss = engine.state.metrics['loss']
+            accuracy = engine.state.metrics['accuracy']
+
+            if loss < self.metrics['loss']:
+                self.metrics['loss'] = loss
+                self.metrics['accuracy'] = accuracy
+                logging.info("New best loss: {:.4f}.".format(loss))
+
         # Early stopping
-        handler = EarlyStopping(patience=3, score_function=lambda engine: -engine.state.metrics['loss'],
+        handler = EarlyStopping(patience=4, score_function=lambda engine: -engine.state.metrics['loss'],
                                 trainer=trainer.engine, cumulative_delta=True)
         evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
         trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs, eval_every=5)
-
-        self.metrics = evaluator.engine.state.metrics

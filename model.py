@@ -5,7 +5,7 @@ import torch.nn.functional as func
 class Net(nn.Module):
     """
     model = torch.nn.Sequential(
-        torch.nn.Linear(params['input_size'], params['hidden_units']),
+        torch.nn.Linear(params['input_size'], params['hidden_units'], bias=False),
         torch.nn.ReLU(),
         torch.nn.Linear(params['hidden_units'], params['output_size']),
     )
