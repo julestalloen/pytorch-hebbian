@@ -3,7 +3,7 @@ import time
 
 import torch
 from ignite.engine import Events
-from ignite.handlers import EarlyStopping
+from ignite.handlers import EarlyStopping, ModelCheckpoint, global_step_from_engine
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -17,7 +17,8 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
 def main(params):
-    run = 'supervised-{}'.format(time.strftime("%Y%m%d-%H%M%S"))
+    identifier = time.strftime("%Y%m%d-%H%M%S")
+    run = 'supervised-{}'.format(identifier)
     logging.info("Starting run '{}'.".format(run))
 
     model = Net([params['input_size'], params['hidden_units'], params['output_size']])
@@ -47,6 +48,12 @@ def main(params):
     handler = EarlyStopping(patience=5, score_function=lambda engine: -engine.state.metrics['loss'],
                             trainer=trainer.engine, cumulative_delta=True)
     evaluator.engine.add_event_handler(Events.COMPLETED, handler)
+
+    # Model checkpoint saving
+    handler = ModelCheckpoint(config.MODELS_DIR, 'sup-' + identifier, n_saved=2, create_dir=True, require_empty=False,
+                              score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
+                              global_step_transform=global_step_from_engine(trainer.engine))
+    evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
 
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2)
 

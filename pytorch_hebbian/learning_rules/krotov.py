@@ -22,6 +22,7 @@ class KrotovsRule(LearningRule):
         self.k = k
 
     def update(self, inputs, w):
+        # TODO: change to work with tensors instead of numpy arrays!
         logging.debug('Received inputs with shape {}'.format(inputs.shape))
         logging.debug('Received synapses with shape {}'.format(w.shape))
 

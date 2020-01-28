@@ -97,5 +97,5 @@ class HebbianTrainer:
         self.input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
         logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
                                                                               len(val_loader.dataset)))
-        logging.info('Evaluating every {} epoch(s).'.format(self.eval_every))
+        logging.info('Training {} epochs, evaluating every {} epoch(s).'.format(epochs, self.eval_every))
         self.engine.run(train_loader, max_epochs=epochs)
