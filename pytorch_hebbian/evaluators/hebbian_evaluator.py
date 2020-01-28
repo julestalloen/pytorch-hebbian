@@ -1,38 +1,60 @@
+import logging
+
 import torch
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
 
-from pytorch_hebbian.evaluators.evaluator import Evaluator
 from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
-from pytorch_hebbian.learning_engines.supervised_engine import SupervisedEngine
+from pytorch_hebbian.trainers import SupervisedTrainer
 
 
-class HebbianEvaluator(Evaluator):
+class HebbianEvaluator:
 
-    def __init__(self, model, data_loader, epochs=100):
-        super().__init__(model, data_loader)
+    def __init__(self, model, epochs=100):
+        self.model = model
         self.epochs = epochs
+        self.early_stopping_patience = 5
+        self.supervised_eval_every = 5
+        self.criterion = torch.nn.CrossEntropyLoss()
+        self.evaluator = SupervisedEvaluator(model=self.model, criterion=self.criterion)
+        self.trainer = None
+        self.metrics = None
+        self._init_metrics()
 
-    def run(self):
-        optimizer = torch.optim.Adam(self.model.parameters())
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
-        criterion = torch.nn.CrossEntropyLoss()
-        evaluator = SupervisedEvaluator(data_loader=self.data_loader, model=self.model, loss_criterion=criterion)
-        supervised_engine = SupervisedEngine(optimizer=optimizer,
-                                             lr_scheduler=lr_scheduler,
-                                             criterion=criterion,
-                                             evaluator=evaluator)
+    def _init_metrics(self):
+        self.metrics = {'loss': float('inf')}
 
-        # Freeze all but final layer
+    def run(self, train_loader, val_loader):
+        # Init/reset metrics and engine state
+        self._init_metrics()
+        self.evaluator.engine.state = None
+
+        # Freeze all but final layer of the model
         for layer in list(self.model.children())[:-1]:
             for param in layer.parameters():
                 param.requires_grad = False
 
-        # # Reset final layer
-        # # TODO: check if this has the desired effect
-        # list(self.model.children())[-1].reset_parameters()
-        #
-        # # TODO: maybe also reset the optimizer en lr_scheduler state?
+        # Create a new optimizer and trainer instance
+        optimizer = torch.optim.Adam(params=self.model.parameters())
+        self.trainer = SupervisedTrainer(model=self.model, optimizer=optimizer, criterion=self.criterion,
+                                         evaluator=self.evaluator)
 
-        # Train with gradient descent and evaluate
-        supervised_engine.train(model=self.model, data_loader=self.data_loader, epochs=self.epochs, eval_every=10)
+        # Metric history saving
+        @self.evaluator.engine.on(Events.COMPLETED)
+        def save_best_metrics(engine):
+            loss = engine.state.metrics['loss']
+            accuracy = engine.state.metrics['accuracy']
 
-        return {'loss': min(evaluator.losses), 'acc': max(evaluator.accuracies)}
+            if loss < self.metrics['loss']:
+                self.metrics['loss'] = loss
+                self.metrics['accuracy'] = accuracy
+                logging.info("New best loss: {:.4f}.".format(loss))
+
+        # Early stopping
+        handler = EarlyStopping(patience=self.early_stopping_patience,
+                                score_function=lambda engine: -engine.state.metrics['loss'],
+                                trainer=self.trainer.engine, cumulative_delta=True)
+        self.evaluator.engine.add_event_handler(Events.COMPLETED, handler)
+
+        self.trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
+                         eval_every=self.supervised_eval_every)
