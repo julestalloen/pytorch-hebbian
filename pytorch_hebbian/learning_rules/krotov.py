@@ -1,6 +1,6 @@
 import logging
 
-import numpy as np
+import torch
 
 from .learning_rule import LearningRule
 
@@ -22,7 +22,6 @@ class KrotovsRule(LearningRule):
         self.k = k
 
     def update(self, inputs, w):
-        # TODO: change to work with tensors instead of numpy arrays!
         logging.debug('Received inputs with shape {}'.format(inputs.shape))
         logging.debug('Received synapses with shape {}'.format(w.shape))
 
@@ -30,26 +29,27 @@ class KrotovsRule(LearningRule):
         batch_size = inputs.shape[0]
         hid = w.shape[0]
         input_size = inputs[0].shape[0]
-        inputs = np.transpose(inputs)
+        inputs = torch.t(inputs)
 
         assert (self.k <= hid), "The amount of hidden units should be larger or equal to k!"
 
-        sig = np.sign(synapses)
-        tot_input = np.dot(sig * np.absolute(synapses) ** (self.norm - 1), inputs)
+        sig = torch.sign(synapses)
+        tot_input = torch.matmul(sig * torch.abs(synapses) ** (self.norm - 1), inputs)
 
-        y = np.argsort(tot_input, axis=0)  # fast implementation -> ranking of currents
-        yl = np.zeros((hid, batch_size))  # activations of post synaptic cells, g(Q) in [3], see also [9] and [10]
-        yl[y[hid - 1, :], np.arange(batch_size)] = 1.0  # see [10]
-        yl[y[hid - self.k], np.arange(batch_size)] = -self.delta
+        y = torch.argsort(tot_input, dim=0)  # fast implementation -> ranking of currents
+        yl = torch.zeros((hid, batch_size))  # activations of post synaptic cells, g(Q) in [3], see also [9] and [10]
+        yl[y[hid - 1, :], torch.arange(batch_size)] = 1.0  # see [10]
+        yl[y[hid - self.k], torch.arange(batch_size)] = -self.delta
 
-        xx = np.sum(np.multiply(yl, tot_input), 1)
+        xx = torch.sum(torch.mul(yl, tot_input), 1)
         # ds is the right hand side of eq [3]
-        temp = np.multiply(np.tile(xx.reshape(xx.shape[0], 1), (1, input_size)), synapses)
-        ds = np.dot(yl, np.transpose(inputs)) - temp
+        temp = torch.mul(xx.view(xx.shape[0], 1).repeat((1, input_size)), synapses)
+        ds = torch.matmul(yl, torch.t(inputs)) - temp
 
-        nc = np.amax(np.absolute(ds))
+        nc = torch.max(torch.abs(ds))
         if nc < self.precision:
             nc = self.precision
-        d_w = np.true_divide(ds, nc)
+        # True division
+        d_w = torch.div(ds.to(dtype=torch.float), nc.to(dtype=torch.float))
 
         return d_w

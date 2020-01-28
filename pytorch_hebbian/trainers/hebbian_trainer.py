@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.contrib.handlers.param_scheduler import LRScheduler
@@ -55,9 +54,8 @@ class HebbianTrainer:
             x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
             y_pred = model(x)
 
-            inputs = np.reshape(x.squeeze(), (x.shape[0], -1))
-            weights_np = self.layer.weight.detach().numpy()
-            d_p = torch.from_numpy(learning_rule.update(inputs, weights_np))
+            inputs = torch.reshape(x, (x.shape[0], -1))
+            d_p = learning_rule.update(inputs, self.layer.weight)
             optimizer.local_step(d_p)
 
             return output_transform(x, y, y_pred)
@@ -89,7 +87,7 @@ class HebbianTrainer:
             if engine.state.iteration % self.vis_weights_every == 0:
                 self.visualizer.visualize_weights(self.layer.weight, self.input_shape, engine.state.epoch)
 
-    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=1):
+    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=20):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
@@ -98,4 +96,5 @@ class HebbianTrainer:
         logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
                                                                               len(val_loader.dataset)))
         logging.info('Training {} epochs, evaluating every {} epoch(s).'.format(epochs, self.eval_every))
+        logging.debug('Visualizing weights every {} epoch(s).'.format(self.vis_weights_every))
         self.engine.run(train_loader, max_epochs=epochs)
