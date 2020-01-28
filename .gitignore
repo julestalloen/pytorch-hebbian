@@ -105,5 +105,4 @@ venv.bak/
 
 .idea/
 datasets/
-output/models/
-output/tensorboard/
+output/
