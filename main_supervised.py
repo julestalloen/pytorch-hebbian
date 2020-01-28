@@ -18,7 +18,7 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 def main(params):
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'supervised-{}'.format(identifier)
+    run = 'sup-{}'.format(identifier)
     logging.info("Starting run '{}'.".format(run))
 
     model = Net([params['input_size'], params['hidden_units'], params['output_size']])
