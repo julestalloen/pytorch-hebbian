@@ -10,11 +10,11 @@ from pytorch_hebbian.trainers import SupervisedTrainer
 
 class HebbianEvaluator:
 
-    def __init__(self, model, epochs=100):
+    def __init__(self, model, epochs=100, early_stopping_patience=5, supervised_eval_every=5):
         self.model = model
         self.epochs = epochs
-        self.early_stopping_patience = 5
-        self.supervised_eval_every = 5
+        self.early_stopping_patience = early_stopping_patience
+        self.supervised_eval_every = supervised_eval_every
         self.criterion = torch.nn.CrossEntropyLoss()
         self.evaluator = SupervisedEvaluator(model=self.model, criterion=self.criterion)
         self.trainer = None
@@ -29,10 +29,14 @@ class HebbianEvaluator:
         self._init_metrics()
         self.evaluator.engine.state = None
 
+        layers = list(self.model.children())
         # Freeze all but final layer of the model
-        for layer in list(self.model.children())[:-1]:
+        for layer in layers[:-1]:
             for param in layer.parameters():
                 param.requires_grad = False
+
+        # Re-initialize weights for final layer
+        layers[-1].reset_parameters()
 
         # Create a new optimizer and trainer instance
         optimizer = torch.optim.Adam(params=self.model.parameters())
@@ -48,7 +52,7 @@ class HebbianEvaluator:
             if loss < self.metrics['loss']:
                 self.metrics['loss'] = loss
                 self.metrics['accuracy'] = accuracy
-                logging.info("New best loss: {:.4f}.".format(loss))
+                logging.info("New best validation loss = {:.4f}.".format(loss))
 
         # Early stopping
         handler = EarlyStopping(patience=self.early_stopping_patience,

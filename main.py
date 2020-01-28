@@ -69,19 +69,20 @@ def main(params):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
-    logging.getLogger("ignite").setLevel(logging.WARNING)
-
     # TODO: WIP
     parser = ArgumentParser()
     parser.add_argument('--json', type=str,
                         help='use a preset json file to specify parameters')
+    parser.add_argument('--debug', action='store_true',
+                        help='enable debug logging')
+    parser.add_argument('--hidden_units', type=int,
+                        help='number of hidden units of the model')
     # parser.add_argument('--batch_size', type=int, default=64,
     #                     help='input batch size for training (default: 64)')
     # parser.add_argument('--val_batch_size', type=int, default=1000,
     #                     help='input batch size for validation (default: 1000)')
-    # parser.add_argument('--epochs', type=int, default=10,
-    #                     help='number of epochs to train (default: 10)')
+    parser.add_argument('--epochs', type=int,
+                        help='number of epochs to train')
     # parser.add_argument('--lr', type=float, default=0.01,
     #                     help='learning rate (default: 0.01)')
     # parser.add_argument("--log_dir", type=str, default="tensorboard_logs",
@@ -91,6 +92,17 @@ if __name__ == '__main__':
     if args.json is not None:
         with open(os.path.join(config.PARAMS_DIR, args.json)) as f:
             params_ = json.load(f)['params']
+            set_args = {k: v for k, v in vars(args).items() if v is not None}
+            params_.update(set_args)
+    else:
+        params_ = vars(args)
+    del params_['debug']
+
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO, format=config.LOGGING_FORMAT)
+    logging.getLogger("ignite").setLevel(logging.WARNING)
+
+    if args.json is not None:
         logging.info("Loaded parameters from '{}'.".format(args.json))
+    logging.debug("Parameters: {}.".format(params_))
 
     main(params_)

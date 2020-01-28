@@ -64,10 +64,10 @@ if __name__ == '__main__':
 
     params_ = {
         'input_size': 28 ** 2,
-        'hidden_units': 100,
+        'hidden_units': 400,
         'output_size': 10,
-        'train_batch_size': 64,
-        'val_batch_size': 64,
+        'train_batch_size': 100,
+        'val_batch_size': 100,
         'val_split': 0.2,
         'epochs': 100,
         'lr': 0.001

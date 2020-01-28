@@ -87,7 +87,7 @@ class HebbianTrainer:
             if engine.state.iteration % self.vis_weights_every == 0:
                 self.visualizer.visualize_weights(self.layer.weight, self.input_shape, engine.state.epoch)
 
-    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=20):
+    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=50):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
