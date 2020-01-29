@@ -7,7 +7,7 @@ from ignite.handlers import EarlyStopping, ModelCheckpoint, global_step_from_eng
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from examples.model import Net
+from model import Net
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer

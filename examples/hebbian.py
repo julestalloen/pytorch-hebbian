@@ -10,7 +10,7 @@ from ignite.handlers import ModelCheckpoint, global_step_from_engine
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from examples.model import Net
+from model import Net
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import HebbianEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
