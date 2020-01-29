@@ -5,7 +5,7 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.contrib.handlers.param_scheduler import LRScheduler
 from ignite.engine import Engine, Events
 
-import config
+from pytorch_hebbian import config
 from pytorch_hebbian.utils import data
 
 

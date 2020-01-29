@@ -10,8 +10,8 @@ from ignite.handlers import ModelCheckpoint, global_step_from_engine
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-import config
-from model import Net
+from examples.model import Net
+from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import HebbianEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
@@ -19,6 +19,8 @@ from pytorch_hebbian.trainers import HebbianTrainer
 from pytorch_hebbian.utils.data import split_dataset
 from pytorch_hebbian.utils.tensorboard import write_stats
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
+
+PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def main(params):
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.json is not None:
-        with open(os.path.join(config.PARAMS_DIR, args.json)) as f:
+        with open(os.path.join(PATH, args.json)) as f:
             params_ = json.load(f)['params']
             set_args = {k: v for k, v in vars(args).items() if v is not None}
             params_.update(set_args)

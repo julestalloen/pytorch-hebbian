@@ -5,7 +5,7 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Events, create_supervised_trainer
 from ignite.metrics import RunningAverage
 
-import config
+from pytorch_hebbian import config
 from pytorch_hebbian.evaluators.supervised_evaluator import SupervisedEvaluator
 
 

@@ -5,7 +5,7 @@ import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
-import config
+from pytorch_hebbian import config
 from pytorch_hebbian.visualizers.weights_visualizer import WeightsVisualizer
 
 

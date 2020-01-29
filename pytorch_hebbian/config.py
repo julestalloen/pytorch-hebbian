@@ -1,10 +1,11 @@
 import os
 
 PATH = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(PATH, '..')
 
-DATASETS_DIR = os.path.join(PATH, 'datasets')
+DATASETS_DIR = os.path.join(ROOT, 'datasets')
 
-OUTPUT_DIR = os.path.join(PATH, 'output')
+OUTPUT_DIR = os.path.join(ROOT, 'output')
 MODELS_DIR = os.path.join(OUTPUT_DIR, 'models')
 PARAMS_DIR = os.path.join(OUTPUT_DIR, 'params')
 VIDEOS_DIR = os.path.join(OUTPUT_DIR, 'videos')
