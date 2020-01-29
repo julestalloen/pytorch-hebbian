@@ -50,7 +50,7 @@ def main(params):
     optimizer = Local(params=model.parameters(), lr=params['lr'])
     # noinspection PyTypeChecker
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
-    evaluator = HebbianEvaluator(model=model)
+    evaluator = HebbianEvaluator(model=model, epochs=500)
     trainer = HebbianTrainer(model=model,
                              learning_rule=learning_rule,
                              optimizer=optimizer,

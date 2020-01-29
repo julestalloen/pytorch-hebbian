@@ -23,6 +23,7 @@ class HebbianTrainer:
         if device is None:
             if torch.cuda.is_available():
                 device = 'cuda'
+                # Make sure all newly created tensors are cuda tensors
                 torch.set_default_tensor_type('torch.cuda.FloatTensor')
             else:
                 device = 'cpu'
@@ -88,7 +89,7 @@ class HebbianTrainer:
             if engine.state.iteration % self.vis_weights_every == 0:
                 self.visualizer.visualize_weights(self.layer.weight, self.input_shape, engine.state.epoch)
 
-    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=50):
+    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=100):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
