@@ -23,6 +23,7 @@ class HebbianTrainer:
         if device is None:
             if torch.cuda.is_available():
                 device = 'cuda'
+                torch.set_default_tensor_type('torch.cuda.FloatTensor')
             else:
                 device = 'cpu'
         logging.info("Device set to '{}'.".format(device))
