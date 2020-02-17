@@ -10,18 +10,16 @@ class Local(Optimizer):
         defaults = dict(lr=lr)
         super(Local, self).__init__(params, defaults)
 
-    def local_step(self, d_p, closure=None):
+    def local_step(self, d_p, layer_idx=0, closure=None):
         """Performs a single local optimization step."""
         loss = None
         if closure is not None:
             loss = closure()
 
-        # TODO: dirty fix
         for group in self.param_groups:
-            for p in group['params'][:-2]:
-                p.data.add_(group['lr'] * d_p)
+            p = group['params'][layer_idx]
+            p.data.add_(group['lr'] * d_p)
 
-        # TODO: dirty fix
         self._step_count += 1
 
         return loss

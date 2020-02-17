@@ -29,14 +29,13 @@ class HebbianTrainer:
                 device = 'cpu'
         logging.info("Device set to '{}'.".format(device))
 
-        # TODO: support multiple layers
+        self.layers = []
         self.layer = None
         for layer in list(model.children())[:-1]:
             if type(layer) == torch.nn.Linear:
-                self.layer = layer
-                weights = layer.weight
-                weights.data.normal_(mean=0.0, std=1.0)
-                logging.info("Updating layer '{}' with shape {}.".format(layer, weights.shape))
+                self.layers.append(layer)
+
+        logging.info("Received {} trainable Linear layer(s).".format(len(self.layers)))
 
         self.engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
 
@@ -58,7 +57,8 @@ class HebbianTrainer:
 
             inputs = torch.reshape(x, (x.shape[0], -1))
             d_p = learning_rule.update(inputs, self.layer.weight)
-            optimizer.local_step(d_p)
+            layer_idx = self.layers.index(self.layer)
+            optimizer.local_step(d_p, layer_idx=layer_idx)
 
             return output_transform(x, y, y_pred)
 
@@ -99,4 +99,11 @@ class HebbianTrainer:
                                                                               len(val_loader.dataset)))
         logging.info('Training {} epochs, evaluating every {} epoch(s).'.format(epochs, self.eval_every))
         logging.debug('Visualizing weights every {} epoch(s).'.format(self.vis_weights_every))
-        self.engine.run(train_loader, max_epochs=epochs)
+
+        # Train layer per layer
+        # TODO: WIP
+        for layer in self.layers:
+            self.layer = layer
+            logging.info("Updating layer '{}' with shape {}.".format(self.layer, self.layer.weight.shape))
+
+            self.engine.run(train_loader, max_epochs=epochs)

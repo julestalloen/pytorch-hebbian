@@ -29,6 +29,17 @@ def main(params):
     logging.info("Starting run '{}'.".format(run))
 
     model = Net([params['input_size'], params['hidden_units'], params['output_size']])
+    if 'initial_weights' in params:
+        initial_weights = params['initial_weights']
+        state_dict_path = os.path.join(PATH, initial_weights)
+
+        if torch.cuda.is_available():
+            device = 'cuda'
+        else:
+            device = 'cpu'
+
+        model.load_state_dict(torch.load(state_dict_path, map_location=torch.device(device)))
+        logging.info("Loaded initial model weights from '{}'.".format(initial_weights))
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -59,7 +70,7 @@ def main(params):
                              visualizer=visualizer)
 
     # Model checkpoint saving
-    handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=2, create_dir=True, require_empty=False,
+    handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
@@ -89,6 +100,8 @@ if __name__ == '__main__':
     #                     help='learning rate (default: 0.01)')
     # parser.add_argument("--log_dir", type=str, default="tensorboard_logs",
     #                     help="log directory for Tensorboard log output")
+    parser.add_argument('--initial_weights', type=str,
+                        help='model weights to initialize training')
     args = parser.parse_args()
 
     if args.json is not None:

@@ -50,7 +50,7 @@ def main(params):
     evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
     # Model checkpoint saving
-    handler = ModelCheckpoint(config.MODELS_DIR, 'sup-' + identifier, n_saved=2, create_dir=True, require_empty=False,
+    handler = ModelCheckpoint(config.MODELS_DIR, 'sup-' + identifier, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
