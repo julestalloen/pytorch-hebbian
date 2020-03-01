@@ -7,22 +7,24 @@ from ignite.handlers import EarlyStopping, ModelCheckpoint, global_step_from_eng
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from model import Net
+from models import dense_net1 as net
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
 from pytorch_hebbian.utils.data import split_dataset
-from pytorch_hebbian.utils.tensorboard import write_stats
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
 def main(params):
+    # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
     run = 'sup-{}'.format(identifier)
     logging.info("Starting run '{}'.".format(run))
 
-    model = Net([params['input_size'], params['hidden_units'], params['output_size']])
+    # Loading the model and possibly initial weights
+    model = net
 
+    # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -33,28 +35,28 @@ def main(params):
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
 
-    # TensorBoard visualizer
+    # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run)
-    # Write some basis stats
-    write_stats(visualizer, model, train_loader, params)
+    visualizer.visualize_stats(model, train_loader, params)
 
+    # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, evaluator=evaluator,
                                 visualizer=visualizer)
 
-    # Early stopping
+    # Adding handlers for early stopping and model checkpoints
     handler = EarlyStopping(patience=5, score_function=lambda engine: -engine.state.metrics['loss'],
                             trainer=trainer.engine, cumulative_delta=True)
     evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
-    # Model checkpoint saving
     handler = ModelCheckpoint(config.MODELS_DIR, 'sup-' + identifier, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
 
+    # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2)
 
 
@@ -63,9 +65,6 @@ if __name__ == '__main__':
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
-        'input_size': 28 ** 2,
-        'hidden_units': 400,
-        'output_size': 10,
         'train_batch_size': 100,
         'val_batch_size': 100,
         'val_split': 0.2,

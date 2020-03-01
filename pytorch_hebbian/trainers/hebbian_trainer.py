@@ -1,109 +1,106 @@
 import logging
+from typing import Union, Optional
 
 import torch
-from ignite.contrib.handlers import ProgressBar
-from ignite.contrib.handlers.param_scheduler import LRScheduler
 from ignite.engine import Engine, Events
+from torch.optim.optimizer import Optimizer
 
-from pytorch_hebbian import config
-from pytorch_hebbian.utils import data
+from pytorch_hebbian import utils, config
+from pytorch_hebbian.learning_rules import LearningRule
+from pytorch_hebbian.trainers import Trainer
+from pytorch_hebbian.visualizers import Visualizer
 
 
-class HebbianTrainer:
+class HebbianTrainer(Trainer):
+    """Trains a model using unsupervised local learning rules also known as Hebbian learning."""
 
-    def __init__(self, model, learning_rule, optimizer, lr_scheduler, evaluator=None, visualizer=None, device=None):
-        self.evaluator = evaluator
-        self.visualizer = visualizer
-        self.train_loader = None
-        self.val_loader = None
-        self.eval_every = None
-        self.vis_weights_every = None
-        self.input_shape = None
+    def __init__(self, model: torch.nn.Sequential, learning_rule: LearningRule, optimizer: Optimizer, lr_scheduler,
+                 evaluator=None, visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
+        device = self._get_device(device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
 
-        if device is None:
-            if torch.cuda.is_available():
-                device = 'cuda'
-                # Make sure all newly created tensors are cuda tensors
-                torch.set_default_tensor_type('torch.cuda.FloatTensor')
-            else:
-                device = 'cpu'
-        logging.info("Device set to '{}'.".format(device))
-
+        # Get the Hebbian trainable layers
         self.layers = []
-        self.layer = None
-        for layer in list(model.children())[:-1]:
-            if type(layer) == torch.nn.Linear:
+        self.layer_indices = []
+        self.layer_names = []
+        for idx, named_param in enumerate(list(model.named_children())[:-1]):
+            name, layer = named_param
+            if type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d:
                 self.layers.append(layer)
+                self.layer_indices.append(idx)
+                self.layer_names.append(name)
 
-        logging.info("Received {} trainable Linear layer(s).".format(len(self.layers)))
+        logging.info("Received {} trainable layer(s): {}.".format(len(self.layers), self.layer_names))
 
-        self.engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
+        # Initialize layer weights according to the learning rule
+        self.learning_rule = learning_rule
+        self.learning_rule.init_layers(self.layers)
 
-        self.scheduler = LRScheduler(lr_scheduler)
-        self.engine.add_event_handler(Events.EPOCH_COMPLETED, self.scheduler)
-
-        self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
-        self.pbar.attach(self.engine)
-
-        self._register_handlers()
-
-    def create_hebbian_trainer(self, model, learning_rule, optimizer, device=None, non_blocking=False,
-                               prepare_batch=data.prepare_batch,
-                               output_transform=lambda x, y, y_pred: 0):
-        def _update(_, batch):
-            model.train()
-            x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
-            y_pred = model(x)
-
-            inputs = torch.reshape(x, (x.shape[0], -1))
-            d_p = learning_rule.update(inputs, self.layer.weight)
-            layer_idx = self.layers.index(self.layer)
-            optimizer.local_step(d_p, layer_idx=layer_idx)
-
-            return output_transform(x, y, y_pred)
-
-        return Engine(_update)
+        super().__init__(engine, model, lr_scheduler, evaluator, visualizer)
 
     def _register_handlers(self):
-        @self.engine.on(Events.EPOCH_STARTED)
-        def log_learning_rate(engine):
-            logging.debug('Learning rate: {}.'.format(round(self.scheduler.get_param(), 6)))
-            self.visualizer.writer.add_scalar('learning_rate', self.scheduler.get_param(), engine.state.epoch - 1)
+        super()._register_handlers()
 
-        @self.engine.on(Events.EPOCH_COMPLETED)
-        def log_validation_results(engine):
-            if engine.state.epoch % self.eval_every == 0:
-                self.evaluator.run(self.train_loader, self.val_loader)
-                metrics = self.evaluator.metrics
-                avg_accuracy = metrics['accuracy']
-                avg_loss = metrics['loss']
+        if self.evaluator is not None:
+            @self.engine.on(Events.EPOCH_COMPLETED)
+            def log_validation_results(engine):
+                if engine.state.epoch % self.eval_every == 0:
+                    self.evaluator.run(self.train_loader, self.val_loader)
+                    metrics = self.evaluator.metrics
+                    avg_accuracy = metrics['accuracy']
+                    avg_loss = metrics['loss']
 
-                self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
-                self.visualizer.writer.add_scalar("validation/avg_loss", avg_loss, engine.state.epoch)
-                self.visualizer.writer.add_scalar("validation/avg_accuracy", avg_accuracy, engine.state.epoch)
+                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                    self.pbar.n = self.pbar.last_print_n = 0
 
-                self.pbar.n = self.pbar.last_print_n = 0
+                    if self.visualizer is not None:
+                        self.visualizer.visualize_metrics(metrics, engine.state.epoch)
 
-        @self.engine.on(Events.ITERATION_COMPLETED)
-        def visualize_weights(engine):
-            if engine.state.iteration % self.vis_weights_every == 0:
-                self.visualizer.visualize_weights(self.layer.weight, self.input_shape, engine.state.epoch)
+    @staticmethod
+    def _prepare_data(inputs, model, layer_index):
+        """Prepare the inputs and layer weights to be passed to the learning rule."""
+        layers = list(model.children())
+        layer = layers[layer_index]
 
-    def run(self, train_loader, val_loader, epochs, eval_every=1, vis_weights_every=100):
-        self.train_loader = train_loader
-        self.val_loader = val_loader
-        self.eval_every = eval_every
-        self.vis_weights_every = vis_weights_every
-        self.input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
-        logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
-                                                                              len(val_loader.dataset)))
-        logging.info('Training {} epochs, evaluating every {} epoch(s).'.format(epochs, self.eval_every))
-        logging.debug('Visualizing weights every {} epoch(s).'.format(self.vis_weights_every))
+        # Get the input right before the layer
+        if layer_index == 0:
+            x = inputs
+        else:
+            x = inputs
+            for lyr in layers[:layer_index]:
+                x = lyr(x)
 
-        # Train layer per layer
-        # TODO: WIP
-        for layer in self.layers:
-            self.layer = layer
-            logging.info("Updating layer '{}' with shape {}.".format(self.layer, self.layer.weight.shape))
+        # Get the layer weight and input image patches
+        if type(layer) == torch.nn.Linear:
+            w = layer.weight
+        elif type(layer) == torch.nn.Conv2d:
+            w = layer.weight
+            w = w.view(w.size(0), -1)
+            x = utils.image.extract_image_patches(x, kernel_size=layer.kernel_size, stride=layer.stride,
+                                                  padding=layer.padding, dilation=layer.dilation)
+        else:
+            raise TypeError("Unsupported layer type!")
 
-            self.engine.run(train_loader, max_epochs=epochs)
+        x = x.view((x.shape[0], -1))
+        logging.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
+        return x, w
+
+    def create_hebbian_trainer(self, model: torch.nn.Module, learning_rule, optimizer, device=None, non_blocking=False,
+                               prepare_batch=utils.data.prepare_batch,
+                               output_transform=lambda x, y: 0):
+        def _update(_, batch):
+            # TODO: should this be .train() or .eval()?
+            model.train()
+            x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+
+            # Train layer per layer
+            for layer_index, layer_name, layer in zip(self.layer_indices, self.layer_names, self.layers):
+                logging.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
+                inputs, weights = self._prepare_data(x, model, layer_index)
+                d_p = learning_rule.update(inputs, weights)
+                d_p = d_p.view(*layer.weight.size())
+                optimizer.local_step(d_p, layer_name=layer_name)
+
+            return output_transform(x, y)
+
+        return Engine(_update)

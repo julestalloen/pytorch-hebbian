@@ -21,20 +21,27 @@ class KrotovsRule(LearningRule):
         self.norm = norm
         self.k = k
 
-    def update(self, inputs, w):
-        logging.debug('Received inputs with shape {}'.format(inputs.shape))
-        logging.debug('Received synapses with shape {}'.format(w.shape))
+    def init_layers(self, layers: list):
+        for layer in layers:
+            if type(layer) == torch.nn.Linear:
+                layer.weight.data.normal_(mean=0.0, std=1.0)
+            elif type(layer) == torch.nn.Conv2d:
+                # layer.weight.data.normal_(mean=0.0, std=1.0)
+                pass
 
-        synapses = w
+    def update(self, inputs, weights):
+        logging.debug('Received inputs with shape {}'.format(inputs.shape))
+        logging.debug('Received weights with shape {}'.format(weights.shape))
+
         batch_size = inputs.shape[0]
-        hid = w.shape[0]
+        hid = weights.shape[0]
         input_size = inputs[0].shape[0]
         inputs = torch.t(inputs)
 
         assert (self.k <= hid), "The amount of hidden units should be larger or equal to k!"
 
-        sig = torch.sign(synapses)
-        tot_input = torch.matmul(sig * torch.abs(synapses) ** (self.norm - 1), inputs)
+        sig = torch.sign(weights)
+        tot_input = torch.matmul(sig * torch.abs(weights) ** (self.norm - 1), inputs)
 
         y = torch.argsort(tot_input, dim=0)  # fast implementation -> ranking of currents
         yl = torch.zeros((hid, batch_size))  # activations of post synaptic cells, g(Q) in [3], see also [9] and [10]
@@ -43,7 +50,7 @@ class KrotovsRule(LearningRule):
 
         xx = torch.sum(torch.mul(yl, tot_input), 1)
         # ds is the right hand side of eq [3]
-        temp = torch.mul(xx.view(xx.shape[0], 1).repeat((1, input_size)), synapses)
+        temp = torch.mul(xx.view(xx.shape[0], 1).repeat((1, input_size)), weights)
         ds = torch.matmul(yl, torch.t(inputs)) - temp
 
         nc = torch.max(torch.abs(ds))
