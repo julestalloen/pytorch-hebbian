@@ -1,12 +1,22 @@
 import math
 import os
+from abc import ABC
 
 import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 from pytorch_hebbian import config
-from pytorch_hebbian.visualizers import Visualizer
+
+
+class Visualizer(ABC):
+    """Abstract base visualizer class to be passed to a trainer."""
+
+    def visualize_metrics(self, metrics, epoch: int, train=False):
+        pass
+
+    def visualize_weights(self, layers: zip, input_shape, step: int):
+        pass
 
 
 class TensorBoardVisualizer(Visualizer):
