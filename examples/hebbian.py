@@ -10,7 +10,7 @@ from ignite.handlers import ModelCheckpoint, global_step_from_engine
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from models import dense_net1 as net
+import models
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import HebbianEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
@@ -43,7 +43,7 @@ def main(args: Namespace, params: dict):
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
-    model = net
+    model = models.dense_net
     if args.initial_weights is not None:
         initial_weights = args.initial_weights
         model = load_weights(model, initial_weights)

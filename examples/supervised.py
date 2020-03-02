@@ -7,7 +7,7 @@ from ignite.handlers import EarlyStopping, ModelCheckpoint, global_step_from_eng
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from models import dense_net1 as net
+import models
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
@@ -22,7 +22,7 @@ def main(params):
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
-    model = net
+    model = models.conv_net
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
