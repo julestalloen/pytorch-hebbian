@@ -49,6 +49,10 @@ class TensorBoardVisualizer(Visualizer):
                 first_trainable = False
             elif type(layer) == torch.nn.Conv2d:
                 weights = layer.weight
+                if input_shape[0] > 1 and idx == 0:
+                    weights = weights.view(-1, input_shape[0], *weights.shape[2:])
+                else:
+                    weights = weights.view(-1, 1, *weights.shape[2:])
                 first_trainable = False
             else:
                 continue

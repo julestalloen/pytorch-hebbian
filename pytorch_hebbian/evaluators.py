@@ -57,6 +57,7 @@ class HebbianEvaluator:
 
         # Early stopping
         handler = EarlyStopping(patience=self.early_stopping_patience,
+                                min_delta=0.0001,
                                 score_function=lambda engine: -engine.state.metrics['loss'],
                                 trainer=self.trainer.engine, cumulative_delta=True)
         self.evaluator.engine.add_event_handler(Events.COMPLETED, handler)

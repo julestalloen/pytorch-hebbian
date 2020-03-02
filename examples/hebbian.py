@@ -102,22 +102,6 @@ if __name__ == '__main__':
                         help='use a preset json file to specify parameters')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='enable debug logging')
-    # parser.add_argument('--train_batch_size', type=int, default=128,
-    #                     help='batch size for training')
-    # parser.add_argument('--val_batch_size', type=int, default=128,
-    #                     help='batch size for validation')
-    # parser.add_argument('--val_split', type=int, default=0.2,
-    #                     help='percentage of the data to use for validation')
-    # parser.add_argument('--epochs', type=int, default=1000,
-    #                     help='number of epochs to train')
-    # parser.add_argument('--delta', type=float, default=0.4,
-    #                     help='delta parameter of the Krotov learning rule.')
-    # parser.add_argument('--k', type=int, default=7,
-    #                     help='k parameter of the Krotov learning rule.')
-    # parser.add_argument('--norm', type=int, default=3,
-    #                     help='norm parameter of the Krotov learning rule.')
-    # parser.add_argument('--lr', type=float, default=0.04,
-    #                     help='learning rate')
     parser.add_argument("--log_dir", type=str, default=config.TENSORBOARD_DIR,
                         help="log directory for Tensorboard log output")
     parser.add_argument('--initial_weights', type=str,
