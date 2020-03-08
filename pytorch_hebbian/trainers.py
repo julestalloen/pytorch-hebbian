@@ -56,6 +56,7 @@ class Trainer(ABC):
 
     def _register_handlers(self):
         if self.visualizer is not None:
+            @self.engine.on(Events.STARTED)
             @self.engine.on(Events.ITERATION_COMPLETED)
             def visualize_weights(engine):
                 if engine.state.iteration % self.vis_weights_every == 0:
@@ -196,9 +197,9 @@ class HebbianTrainer(Trainer):
             w = layer.weight
         elif type(layer) == torch.nn.Conv2d:
             w = layer.weight
-            w = w.view(w.size(0), -1)
-            x = utils.image.extract_image_patches(x, kernel_size=layer.kernel_size, stride=layer.stride,
-                                                  padding=layer.padding, dilation=layer.dilation)
+            w = w.view(-1, layer.kernel_size[0] * layer.kernel_size[1])
+            x = utils.extract_image_patches(x, kernel_size=layer.kernel_size, stride=layer.stride,
+                                            padding=layer.padding, dilation=layer.dilation)
         else:
             raise TypeError("Unsupported layer type!")
 
@@ -207,21 +208,22 @@ class HebbianTrainer(Trainer):
         return x, w
 
     def create_hebbian_trainer(self, model: torch.nn.Module, learning_rule, optimizer, device=None, non_blocking=False,
-                               prepare_batch=utils.data.prepare_batch,
+                               prepare_batch=utils.prepare_batch,
                                output_transform=lambda x, y: 0):
         def _update(_, batch):
             # TODO: should this be .train() or .eval()?
             model.train()
-            x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+            with torch.no_grad():
+                x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
 
-            # Train layer per layer
-            for layer_index, layer_name, layer in zip(self.layer_indices, self.layer_names, self.layers):
-                logging.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
-                inputs, weights = self._prepare_data(x, model, layer_index)
-                d_p = learning_rule.update(inputs, weights)
-                d_p = d_p.view(*layer.weight.size())
-                optimizer.local_step(d_p, layer_name=layer_name)
+                # Train layer per layer
+                for layer_index, layer_name, layer in zip(self.layer_indices, self.layer_names, self.layers):
+                    logging.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
+                    inputs, weights = self._prepare_data(x, model, layer_index)
+                    d_p = learning_rule.update(inputs, weights)
+                    d_p = d_p.view(*layer.weight.size())
+                    optimizer.local_step(d_p, layer_name=layer_name)
 
-            return output_transform(x, y)
+                return output_transform(x, y)
 
         return Engine(_update)

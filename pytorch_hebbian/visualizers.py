@@ -2,11 +2,13 @@ import math
 import os
 from abc import ABC
 
+import numpy as np
 import torch
 import torchvision
+from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
-from pytorch_hebbian import config
+from pytorch_hebbian import config, utils
 
 
 class Visualizer(ABC):
@@ -41,26 +43,44 @@ class TensorBoardVisualizer(Visualizer):
         self.writer.add_scalar(mode + "/avg_accuracy", avg_accuracy, epoch)
 
     def visualize_weights(self, model: torch.nn.Module, input_shape, step: int):
-        first_trainable = True
-        for idx, (name, layer) in enumerate(model.named_children()):
-            if type(layer) == torch.nn.Linear and first_trainable:
-                # This only visualizes a Linear layer if it is the first layer after the input
-                weights = layer.weight.view(-1, *input_shape)
-                first_trainable = False
-            elif type(layer) == torch.nn.Conv2d:
-                weights = layer.weight
-                if input_shape[0] > 1 and idx == 0:
-                    weights = weights.view(-1, input_shape[0], *weights.shape[2:])
+        with torch.no_grad():
+            first_trainable = True
+            for idx, (name, layer) in enumerate(model.named_children()):
+                if type(layer) == torch.nn.Linear and first_trainable:
+                    # This only visualizes a Linear layer if it is the first layer after the input
+                    weights = layer.weight.view(-1, *input_shape)
+                    first_trainable = False
+                elif type(layer) == torch.nn.Conv2d:
+                    weights = layer.weight
+                    if input_shape[0] > 1 and idx == 0:
+                        weights = weights.view(-1, input_shape[0], *weights.shape[2:])
+                    else:
+                        weights = weights.view(-1, 1, *weights.shape[2:])
+                    first_trainable = False
                 else:
-                    weights = weights.view(-1, 1, *weights.shape[2:])
-                first_trainable = False
-            else:
-                continue
+                    continue
 
-            num_weights = weights.shape[0]
-            nrow = math.ceil(math.sqrt(num_weights))
-            grid = torchvision.utils.make_grid(weights, nrow=nrow)
-            self.writer.add_image(name + '.weight', grid, step)
+                num_weights = weights.shape[0]
+                nrow = math.ceil(math.sqrt(num_weights))
+                grid = torchvision.utils.make_grid(weights, nrow=nrow)
+
+                fig = plt.figure()
+                if weights.shape[1] == 1:
+                    grid_np = grid[0, :].numpy()
+                    nc = np.amax(np.absolute(grid_np))
+                    im = plt.imshow(grid_np, cmap='bwr', vmin=-nc, vmax=nc)
+                    plt.colorbar(im, ticks=[np.amin(grid_np), 0, np.amax(grid_np)])
+                else:
+                    grid_np = np.transpose(grid.numpy(), (1, 2, 0))
+                    grid_min = np.amin(grid_np)
+                    grid_max = np.amax(grid_np)
+                    grid_np = (grid_np - grid_min) / (grid_max - grid_min)
+                    plt.imshow(grid_np)
+                plt.axis('off')
+                fig.tight_layout()
+                grid = utils.plot_to_img(fig)
+
+                self.writer.add_image(name + '.weight', grid, step)
 
     def visualize_stats(self, model, data_loader, params):
         """Visualize the model, some input samples and the hyperparameters"""

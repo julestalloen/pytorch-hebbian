@@ -4,19 +4,20 @@ import os
 import time
 from argparse import ArgumentParser, Namespace
 
+# import numpy as np
+# from matplotlib import pyplot as plt
 import torch
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 import models
-from pytorch_hebbian import config
+from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer
-from pytorch_hebbian.utils.data import split_dataset
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +44,7 @@ def main(args: Namespace, params: dict):
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
-    model = models.dense_net
+    model = models.conv_net2
     if args.initial_weights is not None:
         initial_weights = args.initial_weights
         model = load_weights(model, initial_weights)
@@ -55,7 +56,8 @@ def main(args: Namespace, params: dict):
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    train_dataset, val_dataset = split_dataset(dataset, val_split=params['val_split'])
+    dataset = Subset(dataset, [i for i in range(10000)])
+    train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
 
@@ -79,7 +81,7 @@ def main(args: Namespace, params: dict):
                              evaluator=evaluator,
                              visualizer=visualizer)
 
-    # Adding handlers for model checkpoints and visualizing to the engine
+    # Adding handlers for model checkpoints and visualizing to the evaluator and trainer engine
     handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
@@ -89,8 +91,30 @@ def main(args: Namespace, params: dict):
     def log_learning_rate(engine):
         visualizer.writer.add_scalar('learning_rate', trainer.lr_scheduler.get_param(), engine.state.epoch - 1)
 
+    # @trainer.engine.on(Events.STARTED)
+    # @trainer.engine.on(Events.EPOCH_COMPLETED)
+    # def log_unit_stats(engine):
+    #     # TODO: WIP
+    #     layer = model[0]
+    #     weights = layer.weight.detach()
+    #     kernels = weights.view(weights.shape[0], -1)
+    #     num_kernels = kernels.shape[0]
+    #     kernel_size = kernels.shape[1]
+    #     sim = torch.zeros((num_kernels, num_kernels))
+    #
+    #     for i in range(num_kernels):
+    #         for j in range(num_kernels):
+    #             sim[i, j] = torch.sum(np.abs(kernels[i] - kernels[j])) / kernel_size
+    #
+    #     mat = plt.matshow(sim)
+    #     plt.colorbar(mat)
+    #     plt.show()
+    #
+    #     sim = np.expand_dims(sim, axis=0)
+    #     visualizer.writer.add_image('kernel_similarity', torch.from_numpy(sim), engine.state.epoch)
+
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=50)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=20)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)
@@ -111,8 +135,6 @@ if __name__ == '__main__':
     with open(os.path.join(PATH, args_.json)) as f:
         params_ = json.load(f)['params']
 
-    # TODO: why is this needed?
-    logging.root.handlers = []
     logging.basicConfig(level=logging.DEBUG if args_.debug else logging.INFO, format=config.LOGGING_FORMAT)
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
