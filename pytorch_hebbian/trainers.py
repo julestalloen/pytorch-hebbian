@@ -137,15 +137,17 @@ class HebbianTrainer(Trainer):
     """Trains a model using unsupervised local learning rules also known as Hebbian learning."""
 
     def __init__(self, model: torch.nn.Sequential, learning_rule: LearningRule, optimizer: Optimizer, lr_scheduler,
-                 evaluator=None, visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
+                 evaluator=None, supervised_from=-1, visualizer: Visualizer = None,
+                 device: Optional[Union[str, torch.device]] = None):
         device = self._get_device(device)
         engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
+        self.supervised_from = supervised_from
 
         # Get the Hebbian trainable layers
         self.layers = []
         self.layer_indices = []
         self.layer_names = []
-        for idx, named_param in enumerate(list(model.named_children())[:-1]):
+        for idx, named_param in enumerate(list(model.named_children())[:self.supervised_from]):
             name, layer = named_param
             if type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d:
                 self.layers.append(layer)
@@ -167,7 +169,7 @@ class HebbianTrainer(Trainer):
             @self.engine.on(Events.EPOCH_COMPLETED)
             def log_validation_results(engine):
                 if engine.state.epoch % self.eval_every == 0:
-                    self.evaluator.run(self.train_loader, self.val_loader)
+                    self.evaluator.run(self.train_loader, self.val_loader, supervised_from=self.supervised_from)
                     metrics = self.evaluator.metrics
                     avg_accuracy = metrics['accuracy']
                     avg_loss = metrics['loss']

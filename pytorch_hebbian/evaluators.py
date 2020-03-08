@@ -11,9 +11,11 @@ from pytorch_hebbian.trainers import SupervisedTrainer
 
 class HebbianEvaluator:
 
-    def __init__(self, model, epochs=100, early_stopping_patience=5, supervised_eval_every=5):
+    def __init__(self, model: torch.nn.Module, epochs=100, supervised_from=None, early_stopping_patience=5,
+                 supervised_eval_every=5):
         self.model = model
         self.epochs = epochs
+        self.supervised_from = supervised_from
         self.early_stopping_patience = early_stopping_patience
         self.supervised_eval_every = supervised_eval_every
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -25,19 +27,30 @@ class HebbianEvaluator:
     def _init_metrics(self):
         self.metrics = {'loss': float('inf')}
 
-    def run(self, train_loader, val_loader):
+    def run(self, train_loader, val_loader, supervised_from):
+        # Normally the trainer passes the supervised_from parameter to the evaluator. This value is overwritten if the
+        #   parameter was manually passed on creation of the evaluator
+        if self.supervised_from is not None:
+            supervised_from = self.supervised_from
+        logging.info(
+            "Supervised training from layer '{}'.".format(list(self.model.named_children())[supervised_from][0]))
+
         # Init/reset metrics and engine state
         self._init_metrics()
         self.evaluator.engine.state = None
 
         layers = list(self.model.children())
-        # Freeze all but final layer of the model
-        for layer in layers[:-1]:
+        # Freeze the Hebbian trained layers
+        for layer in layers[:supervised_from]:
             for param in layer.parameters():
                 param.requires_grad = False
 
-        # Re-initialize weights for final layer
-        layers[-1].reset_parameters()
+        # Re-initialize weights for the supervised layers
+        for lyr in layers[supervised_from:]:
+            try:
+                lyr.reset_parameters()
+            except AttributeError:
+                pass
 
         # Create a new optimizer and trainer instance
         optimizer = torch.optim.Adam(params=self.model.parameters())

@@ -78,6 +78,7 @@ def main(args: Namespace, params: dict):
                              learning_rule=learning_rule,
                              optimizer=optimizer,
                              lr_scheduler=lr_scheduler,
+                             supervised_from=-1,
                              evaluator=evaluator,
                              visualizer=visualizer)
 

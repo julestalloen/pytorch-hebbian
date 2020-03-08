@@ -49,8 +49,9 @@ def main(params):
     handler = EarlyStopping(patience=6, score_function=lambda engine: -engine.state.metrics['loss'],
                             trainer=trainer.engine, cumulative_delta=True)
     evaluator.engine.add_event_handler(Events.COMPLETED, handler)
+    handler.logger.setLevel(logging.INFO)
 
-    handler = ModelCheckpoint(config.MODELS_DIR, 'sup-' + identifier, n_saved=1, create_dir=True, require_empty=False,
+    handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
