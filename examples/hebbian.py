@@ -6,6 +6,7 @@ from argparse import ArgumentParser, Namespace
 
 # import numpy as np
 # from matplotlib import pyplot as plt
+# from scipy import signal
 import torch
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine
@@ -31,7 +32,9 @@ def load_weights(model, weights):
     else:
         device = 'cpu'
 
-    model.load_state_dict(torch.load(state_dict_path, map_location=torch.device(device)))
+    state_dict = torch.load(state_dict_path, map_location=torch.device(device))
+    model.load_state_dict(state_dict, strict=False)
+
     logging.info("Loaded initial model weights from '{}'.".format(weights))
 
     return model
@@ -48,6 +51,9 @@ def main(args: Namespace, params: dict):
     if args.initial_weights is not None:
         initial_weights = args.initial_weights
         model = load_weights(model, initial_weights)
+        freeze_layers = ['0']
+    else:
+        freeze_layers = None
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
@@ -67,7 +73,10 @@ def main(args: Namespace, params: dict):
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
-    learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
+    learning_rule = {
+        '0': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm']),
+        '3': KrotovsRule(delta=0.2, k=params['k'], norm=params['norm']),
+    }
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
     # TODO: Typing issue should be fixed in future pytorch update
     #   https://github.com/pytorch/pytorch/issues/32645
@@ -79,6 +88,7 @@ def main(args: Namespace, params: dict):
                              optimizer=optimizer,
                              lr_scheduler=lr_scheduler,
                              supervised_from=-1,
+                             freeze_layers=freeze_layers,
                              evaluator=evaluator,
                              visualizer=visualizer)
 
@@ -96,26 +106,36 @@ def main(args: Namespace, params: dict):
     # @trainer.engine.on(Events.EPOCH_COMPLETED)
     # def log_unit_stats(engine):
     #     # TODO: WIP
-    #     layer = model[0]
+    #     # https://en.wikipedia.org/wiki/Digital_image_correlation_and_tracking
+    #     layer = model[1]
     #     weights = layer.weight.detach()
-    #     kernels = weights.view(weights.shape[0], -1)
+    #     weights = weights.view(weights.shape[0], 28, 28)
+    #     # kernels = weights.view(weights.shape[0], -1)
+    #     kernels = torch.squeeze(weights)
     #     num_kernels = kernels.shape[0]
-    #     kernel_size = kernels.shape[1]
-    #     sim = torch.zeros((num_kernels, num_kernels))
+    #     # kernel_size = kernels.shape[1]
+    #     corr = np.zeros((num_kernels, num_kernels))
     #
+    #     # Zero-normalized cross-correlation (ZNCC)
     #     for i in range(num_kernels):
     #         for j in range(num_kernels):
-    #             sim[i, j] = torch.sum(np.abs(kernels[i] - kernels[j])) / kernel_size
+    #             # sim[i, j] = torch.sum(np.abs(kernels[i] - kernels[j])) / kernel_size
+    #             kernel1 = kernels[i].numpy()
+    #             kernel2 = kernels[j].numpy()
+    #             kernel1 = (kernel1 - np.mean(kernel1)) / np.std(kernel1)
+    #             kernel2 = (kernel2 - np.mean(kernel2)) / np.std(kernel2)
+    #             corr_mat = signal.correlate2d(kernel1, kernel2)
+    #             corr[i, j] = np.amax(corr_mat) / 784
     #
-    #     mat = plt.matshow(sim)
+    #     fig = plt.figure()
+    #     mat = plt.imshow(corr, cmap='Reds', vmin=0)
     #     plt.colorbar(mat)
-    #     plt.show()
-    #
-    #     sim = np.expand_dims(sim, axis=0)
-    #     visualizer.writer.add_image('kernel_similarity', torch.from_numpy(sim), engine.state.epoch)
+    #     fig.tight_layout()
+    #     image = utils.plot_to_img(fig)
+    #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=20)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=10)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)

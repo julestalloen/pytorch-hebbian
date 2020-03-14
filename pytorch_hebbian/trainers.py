@@ -1,6 +1,7 @@
 import logging
 from abc import ABC
-from typing import Union, Optional
+from collections import namedtuple
+from typing import Union, Optional, Dict, List
 
 import torch
 from ignite.contrib.handlers import LRScheduler, ProgressBar
@@ -87,10 +88,21 @@ class Trainer(ABC):
 
 
 class SupervisedTrainer(Trainer):
-    """Trains a model using classical supervised backpropagation."""
+    """Trains a model using classical supervised backpropagation.
 
-    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, evaluator, lr_scheduler=None,
-                 visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
+    Args:
+        model: The model to be trained.
+        optimizer: The optimizer used to train the model.
+        criterion: The criterion used for calculating the loss.
+        evaluator: An optional evaluator.
+        lr_scheduler: An optional learning rate scheduler.
+        visualizer: An optional visualizer.
+        device: The device to be used.
+    """
+
+    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, evaluator,
+                 lr_scheduler: torch.optim.lr_scheduler = None, visualizer: Visualizer = None,
+                 device: Optional[Union[str, torch.device]] = None):
         device = self._get_device(device)
         engine = create_supervised_trainer(model, optimizer, criterion, device=device)
 
@@ -134,31 +146,56 @@ class SupervisedTrainer(Trainer):
 
 
 class HebbianTrainer(Trainer):
-    """Trains a model using unsupervised local learning rules also known as Hebbian learning."""
+    """Trains a model using unsupervised local learning rules also known as Hebbian learning.
 
-    def __init__(self, model: torch.nn.Sequential, learning_rule: LearningRule, optimizer: Optimizer, lr_scheduler,
-                 evaluator=None, supervised_from=-1, visualizer: Visualizer = None,
+    The specified learning rule is used to perform local weight updates after each batch of data. Per batch all
+    trainable layers are updated in sequence.
+
+    Args:
+        model (torch.nn.Sequential): The model to be trained.
+        learning_rule (Union[LearningRule, Dict[str, LearningRule]]):
+            The learning rule(s) used to update the model weights.
+        optimizer (Optimizer): The optimizer used to perform the weight updates.
+        lr_scheduler: An optional learning rate scheduler.
+        evaluator: An optional evaluator.
+        supervised_from (int): From which layer (name) the training should be performed supervised.
+        freeze_layers (list): Layers (names) to freeze during training.
+        visualizer (Visualizer): An optional visualizer.
+        device (Optional[Union[str, torch.device]]): The device to perform the training on.
+
+    Attributes:
+        supervised_from: See the supervised_from arg.
+        freeze_layers: See the freeze_layers arg.
+        layers: The Hebbian trainable layers.
+    """
+
+    def __init__(self, model: torch.nn.Sequential, learning_rule: Union[LearningRule, Dict[str, LearningRule]],
+                 optimizer: Optimizer, lr_scheduler=None, evaluator=None, supervised_from: int = -1,
+                 freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
         device = self._get_device(device)
         engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
         self.supervised_from = supervised_from
+        self.freeze_layers = freeze_layers
+        if self.freeze_layers is None:
+            self.freeze_layers = []
 
         # Get the Hebbian trainable layers
+        Layer = namedtuple('Layer', ['idx', 'name', 'layer'])
         self.layers = []
-        self.layer_indices = []
-        self.layer_names = []
-        for idx, named_param in enumerate(list(model.named_children())[:self.supervised_from]):
-            name, layer = named_param
-            if type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d:
-                self.layers.append(layer)
-                self.layer_indices.append(idx)
-                self.layer_names.append(name)
+        for idx, (name, layer) in enumerate(list(model.named_children())[:self.supervised_from]):
+            if (type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d) and name not in self.freeze_layers:
+                self.layers.append(Layer(idx, name, layer))
 
-        logging.info("Received {} trainable layer(s): {}.".format(len(self.layers), self.layer_names))
+        logging.info("Received {} trainable layer(s): {}.".format(len(self.layers), [lyr.name for lyr in self.layers]))
 
         # Initialize layer weights according to the learning rule
         self.learning_rule = learning_rule
-        self.learning_rule.init_layers(self.layers)
+        if type(self.learning_rule) == dict:
+            for rule in self.learning_rule.values():
+                rule.init_layers(self.layers)
+        else:
+            self.learning_rule.init_layers(self.layers)
 
         super().__init__(engine, model, lr_scheduler, evaluator, visualizer)
 
@@ -182,7 +219,13 @@ class HebbianTrainer(Trainer):
 
     @staticmethod
     def _prepare_data(inputs, model, layer_index):
-        """Prepare the inputs and layer weights to be passed to the learning rule."""
+        """Prepare the inputs and layer weights to be passed to the learning rule.
+
+        Args:
+            inputs: The input to the model.
+            model: The model to be trained.
+            layer_index: The index of the layer currently being trained.
+        """
         layers = list(model.children())
         layer = layers[layer_index]
 
@@ -213,16 +256,25 @@ class HebbianTrainer(Trainer):
                                prepare_batch=utils.prepare_batch,
                                output_transform=lambda x, y: 0):
         def _update(_, batch):
-            # TODO: should this be .train() or .eval()?
             model.train()
             with torch.no_grad():
                 x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
 
                 # Train layer per layer
-                for layer_index, layer_name, layer in zip(self.layer_indices, self.layer_names, self.layers):
+                for layer_index, layer_name, layer in self.layers:
                     logging.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
                     inputs, weights = self._prepare_data(x, model, layer_index)
-                    d_p = learning_rule.update(inputs, weights)
+
+                    if type(learning_rule) == dict:
+                        try:
+                            rule = learning_rule[layer_name]
+                        except KeyError:
+                            logging.error("No learning rule was specified for layer '{}'!".format(layer_name))
+                            raise
+                    else:
+                        rule = learning_rule
+
+                    d_p = rule.update(inputs, weights)
                     d_p = d_p.view(*layer.weight.size())
                     optimizer.local_step(d_p, layer_name=layer_name)
 
