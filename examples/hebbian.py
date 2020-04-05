@@ -4,13 +4,13 @@ import os
 import time
 from argparse import ArgumentParser, Namespace
 
-# import numpy as np
-# from matplotlib import pyplot as plt
 # from scipy import signal
 import torch
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine
-from torch.utils.data import DataLoader, Subset
+# import numpy as np
+from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import models
@@ -47,7 +47,7 @@ def main(args: Namespace, params: dict):
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
-    model = models.conv_net2
+    model = models.dense_net1
     if args.initial_weights is not None:
         initial_weights = args.initial_weights
         model = load_weights(model, initial_weights)
@@ -58,11 +58,12 @@ def main(args: Namespace, params: dict):
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
     ])
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = Subset(dataset, [i for i in range(10000)])
+    # dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
@@ -73,10 +74,11 @@ def main(args: Namespace, params: dict):
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
-    learning_rule = {
-        '0': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm']),
-        '3': KrotovsRule(delta=0.2, k=params['k'], norm=params['norm']),
-    }
+    # learning_rule = {
+    #     '0': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm']),
+    #     '3': KrotovsRule(delta=0.2, k=params['k'], norm=params['norm']),
+    # }
+    learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
     # TODO: Typing issue should be fixed in future pytorch update
     #   https://github.com/pytorch/pytorch/issues/32645
@@ -101,6 +103,18 @@ def main(args: Namespace, params: dict):
     @trainer.engine.on(Events.EPOCH_STARTED)
     def log_learning_rate(engine):
         visualizer.writer.add_scalar('learning_rate', trainer.lr_scheduler.get_param(), engine.state.epoch - 1)
+
+    @trainer.engine.on(Events.STARTED)
+    @trainer.engine.on(Events.EPOCH_COMPLETED)
+    def weight_convergence(engine):
+        weights = model[1].weight.detach()
+        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1)
+
+        fig = plt.figure()
+        plt.bar(range(sums.shape[0]), sums)
+        fig.tight_layout()
+        image = utils.plot_to_img(fig)
+        visualizer.writer.add_image('weight_convergence', image, engine.state.epoch)
 
     # @trainer.engine.on(Events.STARTED)
     # @trainer.engine.on(Events.EPOCH_COMPLETED)
@@ -135,7 +149,7 @@ def main(args: Namespace, params: dict):
     #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=10)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=100)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)
