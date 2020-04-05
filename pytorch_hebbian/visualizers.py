@@ -66,12 +66,12 @@ class TensorBoardVisualizer(Visualizer):
 
                 fig = plt.figure()
                 if weights.shape[1] == 1:
-                    grid_np = grid[0, :].numpy()
+                    grid_np = grid[0, :].cpu().numpy()
                     nc = np.amax(np.absolute(grid_np))
                     im = plt.imshow(grid_np, cmap='bwr', vmin=-nc, vmax=nc)
                     plt.colorbar(im, ticks=[np.amin(grid_np), 0, np.amax(grid_np)])
                 else:
-                    grid_np = np.transpose(grid.numpy(), (1, 2, 0))
+                    grid_np = np.transpose(grid.cpu().numpy(), (1, 2, 0))
                     grid_min = np.amin(grid_np)
                     grid_max = np.amax(grid_np)
                     grid_np = (grid_np - grid_min) / (grid_max - grid_min)
