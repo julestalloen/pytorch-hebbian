@@ -108,7 +108,7 @@ def main(args: Namespace, params: dict):
     @trainer.engine.on(Events.EPOCH_COMPLETED)
     def weight_convergence(engine):
         weights = model[1].weight.detach()
-        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1)
+        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
 
         fig = plt.figure()
         plt.bar(range(sums.shape[0]), sums)
