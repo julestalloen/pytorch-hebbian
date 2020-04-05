@@ -7,11 +7,21 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
+class RePU(nn.Module):
+    def __init__(self, n):
+        super(RePU, self).__init__()
+        self.n = n
+
+    def forward(self, x: torch.Tensor):
+        return torch.pow(torch.relu(x), self.n)
+
+
+hidden_units = 2000
 dense_net1 = nn.Sequential(
     Flatten(),
-    nn.Linear(784, 100, bias=False),
+    nn.Linear(784, hidden_units, bias=False),
     nn.ReLU(),
-    nn.Linear(100, 10)
+    nn.Linear(hidden_units, 10)
 )
 
 dense_net = nn.Sequential(
@@ -23,12 +33,28 @@ dense_net = nn.Sequential(
     nn.Linear(100, 10)
 )
 
-num_kernels = 16
-kernel_size = 21
+input_dim = 28
+input_channels = 1
+
+num_kernels = 8
+kernel_size = 3
 conv_net = nn.Sequential(
-    nn.Conv2d(1, num_kernels, kernel_size, bias=False),
+    nn.Conv2d(input_channels, num_kernels, kernel_size, bias=False),
     nn.ReLU(),
     nn.MaxPool2d(2),
     Flatten(),
-    nn.Linear(num_kernels * int(((28 - (kernel_size - 1)) / 2)) ** 2, 10)
+    nn.Linear(num_kernels * int(((input_dim - (kernel_size - 1)) / 2)) ** 2, 10)
+)
+
+num_kernels = [8, 16]
+kernel_size = 3
+conv_net2 = nn.Sequential(
+    nn.Conv2d(input_channels, num_kernels[0], kernel_size, bias=False),
+    nn.ReLU(),
+    nn.MaxPool2d(2),
+    nn.Conv2d(num_kernels[0], num_kernels[1], kernel_size, bias=False),
+    nn.ReLU(),
+    nn.MaxPool2d(2),
+    Flatten(),
+    nn.Linear(num_kernels[1] * int(((input_dim - (kernel_size - 1)) / 2 - (kernel_size - 1)) / 2) ** 2, 10)
 )

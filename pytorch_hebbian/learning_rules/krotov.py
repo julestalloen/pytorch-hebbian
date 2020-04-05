@@ -22,12 +22,9 @@ class KrotovsRule(LearningRule):
         self.k = k
 
     def init_layers(self, layers: list):
-        for layer in layers:
-            if type(layer) == torch.nn.Linear:
+        for layer in [lyr.layer for lyr in layers]:
+            if type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d:
                 layer.weight.data.normal_(mean=0.0, std=1.0)
-            elif type(layer) == torch.nn.Conv2d:
-                # layer.weight.data.normal_(mean=0.0, std=1.0)
-                pass
 
     def update(self, inputs, weights):
         logging.debug('Received inputs with shape {}'.format(inputs.shape))
