@@ -1,4 +1,7 @@
+import os
+
 import numpy as np
+import torch
 from ignite.utils import convert_tensor
 from matplotlib import pyplot as plt
 from torch.utils.data import random_split
@@ -49,3 +52,21 @@ def prepare_batch(batch, device=None, non_blocking=False):
     x, y = batch
     return (convert_tensor(x, device=device, non_blocking=non_blocking),
             convert_tensor(y, device=device, non_blocking=non_blocking))
+
+
+def extract_layer_from_state_dict(state_dict_path: str, layer: str, device=None):
+    """Extract a layer from a state dict and save as a new state dict."""
+    state_dict_dir = os.path.dirname(state_dict_path)
+
+    if device is None:
+        if torch.cuda.is_available():
+            device = 'cuda'
+        else:
+            device = 'cpu'
+
+    state_dict = torch.load(state_dict_path, map_location=torch.device(device))
+    weight_name = '{}.weight'.format(layer)
+    new_state_dict = {weight_name: state_dict[weight_name]}
+    print('Old state dict keys: {}.'.format(state_dict.keys()))
+    print('New state dict keys: {}.'.format(new_state_dict.keys()))
+    torch.save(new_state_dict, os.path.join(state_dict_dir, weight_name + '-test.pth'))
