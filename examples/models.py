@@ -7,11 +7,21 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
+class RePU(nn.Module):
+    def __init__(self, n):
+        super(RePU, self).__init__()
+        self.n = n
+
+    def forward(self, x: torch.Tensor):
+        return torch.pow(torch.relu(x), self.n)
+
+
+hidden_units = 2000
 dense_net1 = nn.Sequential(
     Flatten(),
-    nn.Linear(784, 100, bias=False),
+    nn.Linear(784, hidden_units, bias=False),
     nn.ReLU(),
-    nn.Linear(100, 10)
+    nn.Linear(hidden_units, 10)
 )
 
 dense_net = nn.Sequential(
