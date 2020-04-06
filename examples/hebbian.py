@@ -58,7 +58,6 @@ def main(args: Namespace, params: dict):
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,)),
     ])
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
@@ -67,6 +66,12 @@ def main(args: Namespace, params: dict):
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
+
+    # Analyze dataset
+    data_batch = next(iter(train_loader))[0]
+    logging.debug("Data batch min: {:.4f}, max: {:.4f}.".format(torch.min(data_batch),
+                                                                torch.max(data_batch)))
+    logging.debug("Data batch mean: {1:.4f}, std: {0:.4f}.".format(*torch.std_mean(data_batch)))
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
