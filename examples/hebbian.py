@@ -6,19 +6,20 @@ from argparse import ArgumentParser, Namespace
 
 # from scipy import signal
 import torch
+from ignite.contrib.handlers import LRScheduler
 from ignite.engine import Events
-from ignite.handlers import ModelCheckpoint, global_step_from_engine
+from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
 # import numpy as np
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 import models
 from pytorch_hebbian import config, utils
-from pytorch_hebbian.evaluators import HebbianEvaluator
+from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
-from pytorch_hebbian.trainers import HebbianTrainer
+from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +63,7 @@ def main(args: Namespace, params: dict):
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = Subset(dataset, [i for i in range(10000)])
+    dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
@@ -89,17 +90,43 @@ def main(args: Namespace, params: dict):
     #   https://github.com/pytorch/pytorch/issues/32645
     # noinspection PyTypeChecker
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
-    evaluator = HebbianEvaluator(model=model, epochs=500)
+    lr_scheduler = LRScheduler(lr_scheduler)
+
+    # Initialization function called before each evaluation run of the Hebbian evaluator
+    def init_func(h_model):
+        h_criterion = torch.nn.CrossEntropyLoss()
+        h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion)
+        h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion)
+        h_optimizer = torch.optim.Adam(params=h_model.parameters())
+        h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, verbose=True, patience=4, factor=0.2)
+        h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,
+                                      train_evaluator=h_train_evaluator, evaluator=h_evaluator)
+
+        # Handlers for learning rate scheduling and early stopping
+        # The PyTorch Ignite LRScheduler class does not work with ReduceLROnPlateau
+        h_evaluator.engine.add_event_handler(Events.COMPLETED,
+                                             lambda engine: h_lr_scheduler.step(engine.state.metrics['loss']))
+
+        h_es_handler = EarlyStopping(patience=5,
+                                     min_delta=0.0001,
+                                     score_function=lambda engine: -engine.state.metrics['loss'],
+                                     trainer=h_trainer.engine, cumulative_delta=True)
+        h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
+
+        return h_criterion, h_trainer, h_evaluator
+
+    evaluator = HebbianEvaluator(model=model, epochs=500, init_func=init_func)
     trainer = HebbianTrainer(model=model,
                              learning_rule=learning_rule,
                              optimizer=optimizer,
-                             lr_scheduler=lr_scheduler,
                              supervised_from=-1,
                              freeze_layers=freeze_layers,
                              evaluator=evaluator,
                              visualizer=visualizer)
 
-    # Adding handlers for model checkpoints and visualizing to the evaluator and trainer engine
+    # Adding handlers for learning rate scheduling, model checkpoints and visualizing
+    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
+
     handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True, require_empty=False,
                               score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
                               global_step_transform=global_step_from_engine(trainer.engine))
@@ -107,7 +134,7 @@ def main(args: Namespace, params: dict):
 
     @trainer.engine.on(Events.EPOCH_STARTED)
     def log_learning_rate(engine):
-        visualizer.writer.add_scalar('learning_rate', trainer.lr_scheduler.get_param(), engine.state.epoch - 1)
+        visualizer.writer.add_scalar('learning_rate', lr_scheduler.get_param(), engine.state.epoch - 1)
 
     @trainer.engine.on(Events.STARTED)
     @trainer.engine.on(Events.EPOCH_COMPLETED)

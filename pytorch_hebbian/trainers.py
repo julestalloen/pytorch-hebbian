@@ -1,10 +1,11 @@
 import logging
+import math
 from abc import ABC
 from collections import namedtuple
 from typing import Union, Optional, Dict, List
 
 import torch
-from ignite.contrib.handlers import LRScheduler, ProgressBar
+from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events, create_supervised_trainer
 from ignite.metrics import RunningAverage
 from torch.optim.optimizer import Optimizer
@@ -22,8 +23,7 @@ class Trainer(ABC):
     register the handler for evaluation.
     """
 
-    def __init__(self, engine, model: torch.nn.Module, lr_scheduler=None, evaluator=None,
-                 visualizer: Visualizer = None):
+    def __init__(self, engine, model: torch.nn.Module, evaluator=None, visualizer: Visualizer = None):
         self.engine = engine
         self.model = model
         self.evaluator = evaluator
@@ -32,10 +32,6 @@ class Trainer(ABC):
         self.val_loader = None
         self.eval_every = None
         self.vis_weights_every = None
-
-        if lr_scheduler is not None:
-            self.lr_scheduler = LRScheduler(lr_scheduler)
-            self.engine.add_event_handler(Events.EPOCH_COMPLETED, self.lr_scheduler)
 
         self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
         self.pbar.attach(self.engine, metric_names='all')
@@ -70,7 +66,7 @@ class Trainer(ABC):
         self.eval_every = eval_every
 
         if vis_weights_every == -1:
-            self.vis_weights_every = int(len(self.train_loader.dataset) / self.train_loader.batch_size)  # every epoch
+            self.vis_weights_every = math.ceil(len(self.train_loader.dataset) / self.train_loader.batch_size)
         else:
             self.vis_weights_every = vis_weights_every
 
@@ -95,22 +91,19 @@ class SupervisedTrainer(Trainer):
         optimizer: The optimizer used to train the model.
         criterion: The criterion used for calculating the loss.
         evaluator: An optional evaluator.
-        lr_scheduler: An optional learning rate scheduler.
         visualizer: An optional visualizer.
         device: The device to be used.
     """
 
-    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, evaluator,
-                 lr_scheduler: torch.optim.lr_scheduler = None, visualizer: Visualizer = None,
-                 device: Optional[Union[str, torch.device]] = None):
+    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, train_evaluator=None, evaluator=None,
+                 visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
         device = self._get_device(device)
         engine = create_supervised_trainer(model, optimizer, criterion, device=device)
 
-        # TODO: only works if the evaluator class takes model and criterion as input!
-        self.train_evaluator = evaluator.__class__(model, criterion)
+        self.train_evaluator = train_evaluator
         RunningAverage(output_transform=lambda x: x).attach(engine, 'loss')
 
-        super().__init__(engine, model, lr_scheduler, evaluator, visualizer)
+        super().__init__(engine, model, evaluator, visualizer)
 
     def _register_handlers(self):
         super()._register_handlers()
@@ -156,7 +149,6 @@ class HebbianTrainer(Trainer):
         learning_rule (Union[LearningRule, Dict[str, LearningRule]]):
             The learning rule(s) used to update the model weights.
         optimizer (Optimizer): The optimizer used to perform the weight updates.
-        lr_scheduler: An optional learning rate scheduler.
         evaluator: An optional evaluator.
         supervised_from (int): From which layer (name) the training should be performed supervised.
         freeze_layers (list): Layers (names) to freeze during training.
@@ -170,7 +162,7 @@ class HebbianTrainer(Trainer):
     """
 
     def __init__(self, model: torch.nn.Sequential, learning_rule: Union[LearningRule, Dict[str, LearningRule]],
-                 optimizer: Optimizer, lr_scheduler=None, evaluator=None, supervised_from: int = -1,
+                 optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
         device = self._get_device(device)
@@ -197,7 +189,7 @@ class HebbianTrainer(Trainer):
         else:
             self.learning_rule.init_layers(self.layers)
 
-        super().__init__(engine, model, lr_scheduler, evaluator, visualizer)
+        super().__init__(engine, model, evaluator, visualizer)
 
     def _register_handlers(self):
         super()._register_handlers()

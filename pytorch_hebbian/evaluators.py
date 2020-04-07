@@ -1,4 +1,5 @@
 import logging
+from typing import Callable
 
 import torch
 from ignite.engine import Events
@@ -11,21 +12,56 @@ from pytorch_hebbian.trainers import SupervisedTrainer
 
 class HebbianEvaluator:
 
-    def __init__(self, model: torch.nn.Module, epochs=100, supervised_from=None, early_stopping_patience=5,
+    def __init__(self, model: torch.nn.Module, init_func: Callable[[], tuple] = None, epochs=100, supervised_from=None,
                  supervised_eval_every=5):
         self.model = model
+        if init_func is None:
+            self.init_func = self._init_func
+        else:
+            self.init_func = init_func
         self.epochs = epochs
         self.supervised_from = supervised_from
-        self.early_stopping_patience = early_stopping_patience
         self.supervised_eval_every = supervised_eval_every
-        self.criterion = torch.nn.CrossEntropyLoss()
-        self.evaluator = SupervisedEvaluator(model=self.model, criterion=self.criterion)
-        self.trainer = None
-        self.metrics = None
-        self._init_metrics()
+
+        self._init()
+
+    @staticmethod
+    def _init_func(model):
+        """Default initialization function."""
+        criterion = torch.nn.CrossEntropyLoss()
+        evaluator = SupervisedEvaluator(model=model, criterion=criterion)
+        train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
+        optimizer = torch.optim.Adam(params=model.parameters())
+        trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion,
+                                    train_evaluator=train_evaluator, evaluator=evaluator)
+
+        # Early stopping
+        es_handler = EarlyStopping(patience=5,
+                                   min_delta=0.0001,
+                                   score_function=lambda engine: -engine.state.metrics['loss'],
+                                   trainer=trainer.engine, cumulative_delta=True)
+        evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
+
+        return criterion, trainer, evaluator
 
     def _init_metrics(self):
         self.metrics = {'loss': float('inf')}
+
+    def _init(self):
+        self.criterion, self.trainer, self.evaluator = self.init_func(self.model)
+
+        # Metric history saving
+        @self.evaluator.engine.on(Events.COMPLETED)
+        def save_best_metrics(engine):
+            loss = engine.state.metrics['loss']
+            accuracy = engine.state.metrics['accuracy']
+
+            if loss < self.metrics['loss']:
+                self.metrics['loss'] = loss
+                self.metrics['accuracy'] = accuracy
+                logging.info("New best validation loss = {:.4f}.".format(loss))
+
+        self._init_metrics()
 
     def run(self, train_loader, val_loader, supervised_from):
         # Normally the trainer passes the supervised_from parameter to the evaluator. This value is overwritten if the
@@ -35,9 +71,7 @@ class HebbianEvaluator:
         logging.info(
             "Supervised training from layer '{}'.".format(list(self.model.named_children())[supervised_from][0]))
 
-        # Init/reset metrics and engine state
-        self._init_metrics()
-        self.evaluator.engine.state = None
+        self._init()
 
         layers = list(self.model.children())
         # Freeze the Hebbian trained layers
@@ -51,29 +85,6 @@ class HebbianEvaluator:
                 lyr.reset_parameters()
             except AttributeError:
                 pass
-
-        # Create a new optimizer and trainer instance
-        optimizer = torch.optim.Adam(params=self.model.parameters())
-        self.trainer = SupervisedTrainer(model=self.model, optimizer=optimizer, criterion=self.criterion,
-                                         evaluator=self.evaluator)
-
-        # Metric history saving
-        @self.evaluator.engine.on(Events.COMPLETED)
-        def save_best_metrics(engine):
-            loss = engine.state.metrics['loss']
-            accuracy = engine.state.metrics['accuracy']
-
-            if loss < self.metrics['loss']:
-                self.metrics['loss'] = loss
-                self.metrics['accuracy'] = accuracy
-                logging.info("New best validation loss = {:.4f}.".format(loss))
-
-        # Early stopping
-        handler = EarlyStopping(patience=self.early_stopping_patience,
-                                min_delta=0.0001,
-                                score_function=lambda engine: -engine.state.metrics['loss'],
-                                trainer=self.trainer.engine, cumulative_delta=True)
-        self.evaluator.engine.add_event_handler(Events.COMPLETED, handler)
 
         self.trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
                          eval_every=self.supervised_eval_every)
