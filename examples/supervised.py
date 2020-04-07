@@ -42,24 +42,25 @@ def main(params):
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True, patience=4, factor=0.2)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=4, factor=0.2)
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, train_evaluator=train_evaluator,
                                 evaluator=evaluator, visualizer=visualizer)
 
     # Learning rate scheduling
-    evaluator.engine.add_event_handler(Events.COMPLETED, lambda engine: lr_scheduler.step(engine.state.metrics['loss']))
+    evaluator.engine.add_event_handler(Events.COMPLETED,
+                                       lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
 
     # Early stopping
-    handler = EarlyStopping(patience=8, score_function=lambda engine: -engine.state.metrics['loss'],
+    handler = EarlyStopping(patience=10, score_function=lambda engine: engine.state.metrics['accuracy'],
                             trainer=trainer.engine, cumulative_delta=True)
     evaluator.engine.add_event_handler(Events.COMPLETED, handler)
     handler.logger.setLevel(logging.INFO)
 
     # Model checkpoints
     handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
-                              score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
+                              score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
                               global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
 

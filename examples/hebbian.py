@@ -102,18 +102,26 @@ def main(args: Namespace, params: dict):
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,
                                       train_evaluator=h_train_evaluator, evaluator=h_evaluator)
 
-        # Handlers for learning rate scheduling and early stopping
+        # Learning rate scheduling
         # The PyTorch Ignite LRScheduler class does not work with ReduceLROnPlateau
         h_evaluator.engine.add_event_handler(Events.COMPLETED,
                                              lambda engine: h_lr_scheduler.step(engine.state.metrics['loss']))
 
+        # Model checkpoints
+        h_handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True,
+                                    require_empty=False,
+                                    score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
+                                    global_step_transform=global_step_from_engine(trainer.engine))
+        h_evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, h_handler, {'m': model})
+
+        # Early stopping
         h_es_handler = EarlyStopping(patience=5,
                                      min_delta=0.0001,
                                      score_function=lambda engine: -engine.state.metrics['loss'],
                                      trainer=h_trainer.engine, cumulative_delta=True)
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
-        return h_criterion, h_trainer, h_evaluator
+        return h_trainer, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, epochs=500, init_func=init_func)
     trainer = HebbianTrainer(model=model,
@@ -126,11 +134,6 @@ def main(args: Namespace, params: dict):
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
-
-    handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True, require_empty=False,
-                              score_name='loss', score_function=lambda engine: -engine.state.metrics['loss'],
-                              global_step_transform=global_step_from_engine(trainer.engine))
-    evaluator.evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
 
     @trainer.engine.on(Events.EPOCH_STARTED)
     def log_learning_rate(engine):

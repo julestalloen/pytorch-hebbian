@@ -23,7 +23,7 @@ class HebbianEvaluator:
         self.supervised_from = supervised_from
         self.supervised_eval_every = supervised_eval_every
 
-        self._init()
+        self._init_metrics()
 
     @staticmethod
     def _init_func(model):
@@ -42,16 +42,16 @@ class HebbianEvaluator:
                                    trainer=trainer.engine, cumulative_delta=True)
         evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
 
-        return criterion, trainer, evaluator
+        return trainer, evaluator
 
     def _init_metrics(self):
         self.metrics = {'loss': float('inf')}
 
     def _init(self):
-        self.criterion, self.trainer, self.evaluator = self.init_func(self.model)
+        self._trainer, self._evaluator = self.init_func(self.model)
 
         # Metric history saving
-        @self.evaluator.engine.on(Events.COMPLETED)
+        @self._evaluator.engine.on(Events.COMPLETED)
         def save_best_metrics(engine):
             loss = engine.state.metrics['loss']
             accuracy = engine.state.metrics['accuracy']
@@ -86,8 +86,8 @@ class HebbianEvaluator:
             except AttributeError:
                 pass
 
-        self.trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
-                         eval_every=self.supervised_eval_every)
+        self._trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
+                          eval_every=self.supervised_eval_every)
 
 
 class SupervisedEvaluator:

@@ -1,26 +1,12 @@
-import torch
 import torch.nn as nn
 
-
-class Flatten(nn.Module):
-    def forward(self, x: torch.Tensor):
-        return x.view(x.size(0), -1)
-
-
-class RePU(nn.Module):
-    def __init__(self, n):
-        super(RePU, self).__init__()
-        self.n = n
-
-    def forward(self, x: torch.Tensor):
-        return torch.pow(torch.relu(x), self.n)
-
+from pytorch_hebbian.nn import Flatten, RePU
 
 hidden_units = 2000
 dense_net1 = nn.Sequential(
     Flatten(),
     nn.Linear(784, hidden_units, bias=False),
-    nn.ReLU(),
+    RePU(1),
     nn.Linear(hidden_units, 10)
 )
 
