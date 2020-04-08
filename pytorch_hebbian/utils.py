@@ -54,9 +54,26 @@ def prepare_batch(batch, device=None, non_blocking=False):
             convert_tensor(y, device=device, non_blocking=non_blocking))
 
 
+def load_weights(model, state_dict_path):
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
+
+    state_dict = torch.load(state_dict_path, map_location=torch.device(device))
+    model.load_state_dict(state_dict, strict=False)
+
+    print("Loaded initial model weights from '{}'.".format(state_dict_path))
+
+    return model
+
+
 def extract_layer_from_state_dict(state_dict_path: str, layer: str, device=None):
     """Extract a layer from a state dict and save as a new state dict."""
     state_dict_dir = os.path.dirname(state_dict_path)
+    basename = os.path.splitext(os.path.basename(state_dict_path))
+    state_dict_name = basename[0]
+    state_dict_ext = basename[1]
 
     if device is None:
         if torch.cuda.is_available():
@@ -69,4 +86,6 @@ def extract_layer_from_state_dict(state_dict_path: str, layer: str, device=None)
     new_state_dict = {weight_name: state_dict[weight_name]}
     print('Old state dict keys: {}.'.format(state_dict.keys()))
     print('New state dict keys: {}.'.format(new_state_dict.keys()))
-    torch.save(new_state_dict, os.path.join(state_dict_dir, weight_name + '-test.pth'))
+    output_path = os.path.join(state_dict_dir, "{}-{}{}".format(state_dict_name, weight_name, state_dict_ext))
+    torch.save(new_state_dict, output_path)
+    print("New state dict saved to '{}'.".format(output_path))

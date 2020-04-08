@@ -2,7 +2,7 @@ import torch.nn as nn
 
 from pytorch_hebbian.nn import Flatten, RePU
 
-hidden_units = 900
+hidden_units = 2000
 dense_net1 = nn.Sequential(
     Flatten(),
     nn.Linear(784, hidden_units, bias=False),

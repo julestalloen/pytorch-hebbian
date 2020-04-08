@@ -20,25 +20,10 @@ from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
+from pytorch_hebbian.utils import load_weights
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
-
-
-def load_weights(model, weights):
-    state_dict_path = os.path.join(PATH, weights)
-
-    if torch.cuda.is_available():
-        device = 'cuda'
-    else:
-        device = 'cpu'
-
-    state_dict = torch.load(state_dict_path, map_location=torch.device(device))
-    model.load_state_dict(state_dict, strict=False)
-
-    logging.info("Loaded initial model weights from '{}'.".format(weights))
-
-    return model
 
 
 def main(args: Namespace, params: dict):
@@ -50,9 +35,8 @@ def main(args: Namespace, params: dict):
     # Loading the model and possibly initial weights
     model = models.dense_net1
     if args.initial_weights is not None:
-        initial_weights = args.initial_weights
-        model = load_weights(model, initial_weights)
-        freeze_layers = ['0']
+        model = load_weights(model, os.path.join(PATH, args.initial_weights))
+        freeze_layers = ['1']
     else:
         freeze_layers = None
 

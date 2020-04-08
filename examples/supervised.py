@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 import torch
@@ -11,7 +12,10 @@ import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
+from pytorch_hebbian.utils import load_weights
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
+
+PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def main(params):
@@ -22,6 +26,12 @@ def main(params):
 
     # Loading the model and possibly initial weights
     model = models.dense_net1
+    weights_path = "models/heb-20200408-155246_m_500_acc=0.929-1.weight.pth"
+    state_dict_path = os.path.join(PATH, weights_path)
+    model = load_weights(model, state_dict_path)
+    for param in list(model.children())[1].parameters():
+        param.requires_grad = False
+    print("Freezed", list(model.children())[1])
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
