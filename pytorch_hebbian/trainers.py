@@ -73,9 +73,7 @@ class Trainer(ABC):
                     self.train_evaluator.run(self.train_loader)
                     metrics = self.train_evaluator.metrics
 
-                    avg_accuracy = metrics['accuracy']
-                    avg_loss = metrics['loss']
-                    self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                    self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, **metrics))
 
                     if self.visualizer is not None:
                         self.visualizer.visualize_metrics(metrics, engine.state.epoch, train=True)
@@ -87,9 +85,7 @@ class Trainer(ABC):
                     self.evaluator.run(**self.evaluator_args())
                     metrics = self.evaluator.metrics
 
-                    avg_accuracy = metrics['accuracy']
-                    avg_loss = metrics['loss']
-                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, **metrics))
                     self.pbar.n = self.pbar.last_print_n = 0
 
                     if self.visualizer is not None:
