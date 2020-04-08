@@ -2,7 +2,7 @@ import logging
 import math
 from abc import ABC
 from collections import namedtuple
-from typing import Union, Optional, Dict, List
+from typing import Union, Optional, Dict, List, Callable
 
 import torch
 from ignite.contrib.handlers import ProgressBar
@@ -19,19 +19,25 @@ from pytorch_hebbian.visualizers import Visualizer
 class Trainer(ABC):
     """Abstract base trainer class.
 
-    Supports (optional) evaluating and visualizing by default. It is up to the child class extending this class to
-    register the handler for evaluation.
+    Supports (optional) evaluating and visualizing by default.
     """
 
-    def __init__(self, engine, model: torch.nn.Module, evaluator=None, visualizer: Visualizer = None):
+    def __init__(self, engine, model: torch.nn.Module, evaluator=None, train_evaluator=None,
+                 evaluator_args: Callable[[], dict] = None, visualizer: Visualizer = None):
         self.engine = engine
         self.model = model
         self.evaluator = evaluator
+        self.train_evaluator = train_evaluator
         self.visualizer = visualizer
         self.train_loader = None
         self.val_loader = None
         self.eval_every = None
         self.vis_weights_every = None
+
+        if evaluator_args is None:
+            self.evaluator_args = lambda: {'val_loader': self.val_loader}
+        else:
+            self.evaluator_args = evaluator_args
 
         self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
         self.pbar.attach(self.engine, metric_names='all')
@@ -59,6 +65,35 @@ class Trainer(ABC):
                 if engine.state.iteration % self.vis_weights_every == 0:
                     input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
                     self.visualizer.visualize_weights(self.model, input_shape, engine.state.epoch)
+
+        if self.train_evaluator is not None:
+            @self.engine.on(Events.EPOCH_COMPLETED)
+            def log_training_results(engine):
+                if engine.state.epoch % self.eval_every == 0:
+                    self.train_evaluator.run(self.train_loader)
+                    metrics = self.train_evaluator.metrics
+
+                    avg_accuracy = metrics['accuracy']
+                    avg_loss = metrics['loss']
+                    self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+
+                    if self.visualizer is not None:
+                        self.visualizer.visualize_metrics(metrics, engine.state.epoch, train=True)
+
+        if self.evaluator is not None:
+            @self.engine.on(Events.EPOCH_COMPLETED)
+            def log_validation_results(engine):
+                if engine.state.epoch % self.eval_every == 0:
+                    self.evaluator.run(**self.evaluator_args())
+                    metrics = self.evaluator.metrics
+
+                    avg_accuracy = metrics['accuracy']
+                    avg_loss = metrics['loss']
+                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
+                    self.pbar.n = self.pbar.last_print_n = 0
+
+                    if self.visualizer is not None:
+                        self.visualizer.visualize_metrics(metrics, engine.state.epoch)
 
     def run(self, train_loader: DataLoader, val_loader: DataLoader, epochs: int, eval_every=1, vis_weights_every=-1):
         self.train_loader = train_loader
@@ -97,46 +132,11 @@ class SupervisedTrainer(Trainer):
 
     def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, train_evaluator=None, evaluator=None,
                  visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
-        device = self._get_device(device)
-        engine = create_supervised_trainer(model, optimizer, criterion, device=device)
-
-        self.train_evaluator = train_evaluator
+        engine = create_supervised_trainer(model, optimizer, criterion, device=self._get_device(device))
         RunningAverage(output_transform=lambda x: x).attach(engine, 'loss')
 
-        super().__init__(engine, model, evaluator, visualizer)
-
-    def _register_handlers(self):
-        super()._register_handlers()
-
-        if self.train_evaluator is not None:
-            @self.engine.on(Events.EPOCH_COMPLETED)
-            def log_training_results(engine):
-                if engine.state.epoch % self.eval_every == 0:
-                    self.train_evaluator.run(self.train_loader)
-                    metrics = self.train_evaluator.engine.state.metrics
-                    avg_accuracy = metrics['accuracy']
-                    avg_loss = metrics['loss']
-
-                    self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
-
-                    if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(metrics, engine.state.epoch, train=True)
-
-        if self.evaluator is not None:
-            @self.engine.on(Events.EPOCH_COMPLETED)
-            def log_validation_results(engine):
-                if engine.state.epoch % self.eval_every == 0:
-                    self.evaluator.run(self.val_loader)
-                    # metrics = self.evaluator.engine.state.metrics
-                    metrics = self.evaluator.metrics
-                    avg_accuracy = metrics['accuracy']
-                    avg_loss = metrics['loss']
-
-                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
-                    self.pbar.n = self.pbar.last_print_n = 0
-
-                    if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(metrics, engine.state.epoch)
+        super().__init__(engine=engine, model=model, evaluator=evaluator, train_evaluator=train_evaluator,
+                         visualizer=visualizer)
 
 
 class HebbianTrainer(Trainer):
@@ -166,8 +166,7 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
-        device = self._get_device(device)
-        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=self._get_device(device))
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
         if self.freeze_layers is None:
@@ -190,25 +189,12 @@ class HebbianTrainer(Trainer):
         else:
             self.learning_rule.init_layers(self.layers)
 
-        super().__init__(engine, model, evaluator, visualizer)
-
-    def _register_handlers(self):
-        super()._register_handlers()
-
-        if self.evaluator is not None:
-            @self.engine.on(Events.EPOCH_COMPLETED)
-            def log_validation_results(engine):
-                if engine.state.epoch % self.eval_every == 0:
-                    self.evaluator.run(self.train_loader, self.val_loader, supervised_from=self.supervised_from)
-                    metrics = self.evaluator.metrics
-                    avg_accuracy = metrics['accuracy']
-                    avg_loss = metrics['loss']
-
-                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, avg_accuracy, avg_loss))
-                    self.pbar.n = self.pbar.last_print_n = 0
-
-                    if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(metrics, engine.state.epoch)
+        super().__init__(engine=engine, model=model, evaluator=evaluator, visualizer=visualizer,
+                         evaluator_args=lambda: {
+                             'train_loader': self.train_loader,
+                             'val_loader': self.val_loader,
+                             'supervised_from': self.supervised_from,
+                         })
 
     @staticmethod
     def _prepare_data(inputs, model, layer_index):
