@@ -13,4 +13,4 @@ class RePU(nn.Module):
         self.n = n
 
     def forward(self, x: torch.Tensor):
-        return torch.pow(torch.relu(x), self.n)
+        return torch.relu(x) ** self.n

@@ -12,13 +12,16 @@ from pytorch_hebbian.trainers import SupervisedTrainer
 
 class HebbianEvaluator:
 
-    def __init__(self, model: torch.nn.Module, init_func: Callable[[], tuple] = None, epochs=100, supervised_from=None,
-                 supervised_eval_every=5):
+    def __init__(self, model: torch.nn.Module, score_name: str, score_function: Callable,
+                 init_function: Callable[[], tuple] = None, epochs: int = 100, supervised_from: int = None,
+                 supervised_eval_every: int = 5):
         self.model = model
-        if init_func is None:
-            self.init_func = self._init_func
+        self.score_name = score_name
+        self.score_function = score_function
+        if init_function is None:
+            self.init_function = self._init_function
         else:
-            self.init_func = init_func
+            self.init_function = init_function
         self.epochs = epochs
         self.supervised_from = supervised_from
         self.supervised_eval_every = supervised_eval_every
@@ -26,7 +29,7 @@ class HebbianEvaluator:
         self._init_metrics()
 
     @staticmethod
-    def _init_func(model):
+    def _init_function(model):
         """Default initialization function."""
         criterion = torch.nn.CrossEntropyLoss()
         evaluator = SupervisedEvaluator(model=model, criterion=criterion)
@@ -45,21 +48,20 @@ class HebbianEvaluator:
         return trainer, evaluator
 
     def _init_metrics(self):
-        self.metrics = {'loss': float('inf')}
+        self.metrics = {}
+        self.best_score = None
 
     def _init(self):
-        self._trainer, self._evaluator = self.init_func(self.model)
+        self._trainer, self._evaluator = self.init_function(self.model)
 
         # Metric history saving
         @self._evaluator.engine.on(Events.COMPLETED)
         def save_best_metrics(engine):
-            loss = engine.state.metrics['loss']
-            accuracy = engine.state.metrics['accuracy']
-
-            if loss < self.metrics['loss']:
-                self.metrics['loss'] = loss
-                self.metrics['accuracy'] = accuracy
-                logging.info("New best validation loss = {:.4f}.".format(loss))
+            current_score = self.score_function(engine)
+            if self.best_score is None or current_score > self.best_score:
+                self.best_score = current_score
+                self.metrics = engine.state.metrics
+                logging.info("New best validation {} = {:.4f}.".format(self.score_name, self.best_score))
 
         self._init_metrics()
 
@@ -106,6 +108,8 @@ class SupervisedEvaluator:
             }
 
         self.engine = create_supervised_evaluator(model, metrics=metrics, device=device)
+        self.metrics = {}  # engine.state.metrics only created on run
 
     def run(self, val_loader):
         self.engine.run(val_loader)
+        self.metrics = self.engine.state.metrics

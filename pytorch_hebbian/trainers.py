@@ -127,7 +127,8 @@ class SupervisedTrainer(Trainer):
             def log_validation_results(engine):
                 if engine.state.epoch % self.eval_every == 0:
                     self.evaluator.run(self.val_loader)
-                    metrics = self.evaluator.engine.state.metrics
+                    # metrics = self.evaluator.engine.state.metrics
+                    metrics = self.evaluator.metrics
                     avg_accuracy = metrics['accuracy']
                     avg_loss = metrics['loss']
 
