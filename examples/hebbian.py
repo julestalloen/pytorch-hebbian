@@ -44,8 +44,8 @@ def main(args: Namespace, params: dict):
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
@@ -173,7 +173,7 @@ def main(args: Namespace, params: dict):
     #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=2)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=100)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)
