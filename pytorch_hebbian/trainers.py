@@ -101,8 +101,11 @@ class Trainer(ABC):
         else:
             self.vis_weights_every = vis_weights_every
 
-        logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
-                                                                              len(val_loader.dataset)))
+        if self.val_loader is not None:
+            logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
+                                                                                  len(val_loader.dataset)))
+        else:
+            logging.info('Received {} training samples.'.format(len(train_loader.dataset)))
         if self.evaluator is not None:
             info_str = 'Training {} epoch(s), evaluating every {} epoch(s).'.format(epochs, self.eval_every)
         else:
