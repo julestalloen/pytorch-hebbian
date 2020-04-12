@@ -115,8 +115,8 @@ def main(args: Namespace, params: dict):
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
         # Trainer progress bar persistence
-        if args.no_persist_pb:
-            h_trainer.pbar.persist = False
+        # if args.no_persist_pb:
+        h_trainer.pbar.persist = False
 
         return h_trainer, h_evaluator
 
