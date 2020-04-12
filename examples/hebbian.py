@@ -11,7 +11,7 @@ from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
 # import numpy as np
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 import models
@@ -47,7 +47,7 @@ def main(args: Namespace, params: dict):
     # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = Subset(dataset, [i for i in range(10000)])
+    # dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
@@ -173,7 +173,7 @@ def main(args: Namespace, params: dict):
     #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=100)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=200)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)
