@@ -18,7 +18,7 @@ class UnitConvergence(Metric):
 
     def compute(self):
         weights = self.layer.weight.detach()
-        sums = torch.sum(torch.pow(torch.abs(weights), self.norm), 1).cpu()
+        sums = torch.sum(torch.pow(torch.abs(weights), self.norm), 1)
         num_converged = torch.sum(sums < (1 + self.delta))
         num = sums.shape[0]
 
