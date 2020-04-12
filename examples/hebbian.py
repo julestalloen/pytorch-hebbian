@@ -42,7 +42,21 @@ def main(args: Namespace, params: dict):
     else:
         freeze_layers = None
 
-    model.to(args.device)
+    # Device selection
+    if args.device is None:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            # Make sure all newly created tensors are cuda tensors
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        else:
+            device = 'cpu'
+    elif args.device == 'cuda' and not torch.cuda.is_available():
+        device = 'cpu'
+    else:
+        device = args.device
+
+    # Move the model to the selected device
+    model.to(device)
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
@@ -84,13 +98,13 @@ def main(args: Namespace, params: dict):
     def init_function(h_model):
         h_criterion = torch.nn.CrossEntropyLoss()
         # h_criterion = SPELoss(2)
-        h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=args.device)
-        h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=args.device)
+        h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
+        h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_optimizer = torch.optim.Adam(params=h_model.parameters())
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=4,
                                                                     factor=0.2)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,
-                                      train_evaluator=h_train_evaluator, evaluator=h_evaluator, device=args.device)
+                                      train_evaluator=h_train_evaluator, evaluator=h_evaluator, device=device)
 
         # Learning rate scheduling
         # The PyTorch Ignite LRScheduler class does not work with ReduceLROnPlateau
@@ -119,11 +133,11 @@ def main(args: Namespace, params: dict):
                                  init_function=init_function)
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
                              freeze_layers=freeze_layers, evaluator=evaluator, visualizer=visualizer,
-                             device=args.device)
+                             device=device)
 
     # Metrics
     UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
-    if args.device == 'cuda':
+    if device == 'cuda':
         GpuInfo().attach(trainer.engine, name='gpu')
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
