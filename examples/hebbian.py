@@ -46,8 +46,6 @@ def main(args: Namespace, params: dict):
     else:
         device = 'cpu'
 
-    model.to(device)
-
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
