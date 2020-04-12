@@ -165,7 +165,9 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
-        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=self._get_device(device))
+        device = self._get_device(device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
+        model.to(device)
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
         if self.freeze_layers is None:
