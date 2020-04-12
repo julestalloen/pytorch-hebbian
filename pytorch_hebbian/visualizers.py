@@ -84,6 +84,7 @@ class TensorBoardVisualizer(Visualizer):
 
     def visualize_stats(self, model, data_loader, params):
         """Visualize the model, some input samples and the hyperparameters"""
+        model.cpu()
         images, labels = next(iter(data_loader))
         self.writer.add_graph(model, images)
         self.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
