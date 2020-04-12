@@ -7,6 +7,7 @@ from argparse import ArgumentParser, Namespace
 # from scipy import signal
 import torch
 from ignite.contrib.handlers import LRScheduler
+from ignite.contrib.metrics import GpuInfo
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
 # import numpy as np
@@ -18,6 +19,7 @@ import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
 from pytorch_hebbian.learning_rules import KrotovsRule
+from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 from pytorch_hebbian.utils import load_weights
@@ -39,6 +41,12 @@ def main(args: Namespace, params: dict):
         freeze_layers = ['1']
     else:
         freeze_layers = None
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
+
+    model.to(device)
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
@@ -116,6 +124,11 @@ def main(args: Namespace, params: dict):
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
                              freeze_layers=freeze_layers, evaluator=evaluator, visualizer=visualizer)
 
+    # Metrics
+    UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+    if device == 'cuda':
+        GpuInfo().attach(trainer.engine, name='gpu')
+
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
 
@@ -123,22 +136,20 @@ def main(args: Namespace, params: dict):
     def log_learning_rate(engine):
         visualizer.writer.add_scalar('learning_rate', lr_scheduler.get_param(), engine.state.epoch - 1)
 
-    @trainer.engine.on(Events.STARTED)
+    # @trainer.engine.on(Events.STARTED)
     @trainer.engine.on(Events.EPOCH_COMPLETED)
-    def log_weight_convergence(engine):
+    def log_unit_convergence(engine):
         weights = model[1].weight.detach()
         sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
-        num_converged = torch.sum(sums < 1.5)
-        num = sums.shape[0]
-        visualizer.writer.add_scalar('converged_units', num_converged, engine.state.epoch)
+        visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
 
         fig = plt.figure()
         plt.bar(range(sums.shape[0]), sums)
-        plt.xlabel("{} of {} hidden units 'converged'".format(num_converged, num))
+        plt.xlabel("{}% of hidden units 'converged'".format(engine.state.metrics['unit_conv'] * 100))
         plt.ylabel("Sum of incoming weights")
         fig.tight_layout()
         image = utils.plot_to_img(fig)
-        visualizer.writer.add_image('weight_convergence', image, engine.state.epoch)
+        visualizer.writer.add_image('unit_weight_sum', image, engine.state.epoch)
 
     # @trainer.engine.on(Events.STARTED)
     # @trainer.engine.on(Events.EPOCH_COMPLETED)

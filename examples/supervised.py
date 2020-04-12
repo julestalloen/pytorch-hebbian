@@ -39,8 +39,8 @@ def main(params):
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = Subset(dataset, [i for i in range(10000)])
 
@@ -104,11 +104,11 @@ if __name__ == '__main__':
 
     params_ = {
         'train_batch_size': 128,
-        'val_batch_size': 128,
+        'val_batch_size': 512,
         'val_split': 0.2,
-        'epochs': 80,
-        'lr': 0.001,
-        "train_all": True,
+        'epochs': 500,
+        'lr': 1e-4,
+        "train_all": False,
     }
 
     main(params_)
