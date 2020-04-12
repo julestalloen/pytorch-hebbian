@@ -114,6 +114,10 @@ def main(args: Namespace, params: dict):
         h_es_handler.logger.setLevel(logging.INFO)
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
+        # Trainer progress bar persistence
+        if args.no_persist_pb:
+            h_trainer.persist_progress_bar = False
+
         return h_trainer, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, score_name='accuracy',
@@ -125,8 +129,12 @@ def main(args: Namespace, params: dict):
 
     # Metrics
     UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
-    if args.gpu_metric and device == 'cuda':
+    if args.gpu_metrics and device == 'cuda':
         GpuInfo().attach(trainer.engine, name='gpu')
+
+    # Trainer progress bar persistence
+    if args.no_persist_pb:
+        trainer.persist_progress_bar = False
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
@@ -201,8 +209,10 @@ if __name__ == '__main__':
                         help='model weights to initialize training')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'],
                         help="'cuda' (GPU) or 'cpu'")
-    parser.add_argument('--gpu_metric', action='store_true', default=False,
-                        help='enable gpu metric in progress bar')
+    parser.add_argument('--gpu_metrics', action='store_true', default=False,
+                        help='enable gpu metrics in the trainer progress bar')
+    parser.add_argument('--no_persist_pb', action='store_true', default=False,
+                        help="don't persist the trainer progress bar")
     args_ = parser.parse_args()
 
     with open(os.path.join(PATH, args_.json)) as f:

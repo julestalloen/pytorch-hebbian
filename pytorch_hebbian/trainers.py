@@ -33,13 +33,14 @@ class Trainer(ABC):
         self.val_loader = None
         self.eval_every = None
         self.vis_weights_every = None
+        self.persist_progress_bar = True
 
         if evaluator_args is None:
             self.evaluator_args = lambda: {'val_loader': self.val_loader}
         else:
             self.evaluator_args = evaluator_args
 
-        self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
+        self.pbar = ProgressBar(persist=self.persist_progress_bar, bar_format=config.IGNITE_BAR_FORMAT)
         self.pbar.attach(self.engine, metric_names='all')
 
         self._register_handlers()
