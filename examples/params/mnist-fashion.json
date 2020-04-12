@@ -1,0 +1,13 @@
+{
+  "description": "Hebbian learning with Krotov rule params for mnist digits.",
+  "params": {
+    "train_batch_size": 100,
+    "val_batch_size": 100,
+    "val_split": 0.2,
+    "epochs": 1000,
+    "delta": 0.2,
+    "k": 7,
+    "norm": 3,
+    "lr": 0.04
+  }
+}

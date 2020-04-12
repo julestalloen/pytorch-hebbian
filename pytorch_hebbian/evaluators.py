@@ -108,7 +108,7 @@ class SupervisedEvaluator:
             }
 
         self.engine = create_supervised_evaluator(model, metrics=metrics, device=device)
-        self.metrics = {}  # engine.state.metrics only created on run
+        self.metrics = {}  # engine.state.metrics only created on engine run
 
     def run(self, val_loader):
         self.engine.run(val_loader)

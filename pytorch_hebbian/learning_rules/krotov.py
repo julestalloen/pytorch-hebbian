@@ -26,7 +26,7 @@ class KrotovsRule(LearningRule):
             if type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d:
                 layer.weight.data.normal_(mean=0.0, std=1.0)
 
-    def update(self, inputs, weights):
+    def update(self, inputs: torch.Tensor, weights: torch.Tensor):
         logging.debug('Received inputs with shape {}'.format(inputs.shape))
         logging.debug('Received weights with shape {}'.format(weights.shape))
 

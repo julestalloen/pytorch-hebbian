@@ -2,7 +2,7 @@ import logging
 import math
 from abc import ABC
 from collections import namedtuple
-from typing import Union, Optional, Dict, List, Callable
+from typing import Union, Optional, Dict, List, Callable, Sequence
 
 import torch
 from ignite.contrib.handlers import ProgressBar
@@ -165,7 +165,9 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
-        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=self._get_device(device))
+        device = self._get_device(device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
+        model.to(device)
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
         if self.freeze_layers is None:
@@ -233,7 +235,7 @@ class HebbianTrainer(Trainer):
     def create_hebbian_trainer(self, model: torch.nn.Module, learning_rule, optimizer, device=None, non_blocking=False,
                                prepare_batch=utils.prepare_batch,
                                output_transform=lambda x, y: 0):
-        def _update(_, batch):
+        def _update(_, batch: Sequence[torch.Tensor]):
             model.train()
             with torch.no_grad():
                 x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
