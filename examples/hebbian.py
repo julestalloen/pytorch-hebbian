@@ -144,7 +144,7 @@ def main(args: Namespace, params: dict):
 
         fig = plt.figure()
         plt.bar(range(sums.shape[0]), sums)
-        plt.xlabel("{}% of hidden units 'converged'".format(engine.state.metrics['unit_conv'] * 100))
+        plt.xlabel("{:.2f}% of hidden units 'converged'".format(engine.state.metrics['unit_conv'] * 100))
         plt.ylabel("Sum of incoming weights")
         fig.tight_layout()
         image = utils.plot_to_img(fig)
