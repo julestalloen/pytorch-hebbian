@@ -116,7 +116,7 @@ def main(args: Namespace, params: dict):
 
         # Trainer progress bar persistence
         if args.no_persist_pb:
-            h_trainer.persist_progress_bar = False
+            h_trainer.pbar.persist = False
 
         return h_trainer, h_evaluator
 
@@ -134,7 +134,7 @@ def main(args: Namespace, params: dict):
 
     # Trainer progress bar persistence
     if args.no_persist_pb:
-        trainer.persist_progress_bar = False
+        trainer.pbar.persist = False
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
