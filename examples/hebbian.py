@@ -46,14 +46,17 @@ def main(args: Namespace, params: dict):
     if args.device is None:
         if torch.cuda.is_available():
             device = 'cuda'
-            # Make sure all newly created tensors are cuda tensors
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
         else:
             device = 'cpu'
-    elif args.device == 'cuda' and not torch.cuda.is_available():
-        device = 'cpu'
+    elif args.device == 'cuda':
+        if torch.cuda.is_available():
+            device = 'cuda'
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        else:
+            device = 'cpu'
     else:
-        device = args.device
+        device = 'cpu'
 
     # Move the model to the selected device
     model.to(device)
