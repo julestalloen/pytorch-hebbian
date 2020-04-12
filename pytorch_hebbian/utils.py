@@ -89,3 +89,22 @@ def extract_layer_from_state_dict(state_dict_path: str, layer: str, device=None)
     output_path = os.path.join(state_dict_dir, "{}-{}{}".format(state_dict_name, weight_name, state_dict_ext))
     torch.save(new_state_dict, output_path)
     print("New state dict saved to '{}'.".format(output_path))
+
+
+def get_device(device=None):
+    if device is None:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        else:
+            device = 'cpu'
+    elif device == 'cuda':
+        if torch.cuda.is_available():
+            device = 'cuda'
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        else:
+            device = 'cpu'
+    else:
+        device = 'cpu'
+
+    return device

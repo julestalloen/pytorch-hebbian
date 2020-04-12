@@ -22,7 +22,6 @@ from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
-from pytorch_hebbian.utils import load_weights
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
@@ -37,28 +36,14 @@ def main(args: Namespace, params: dict):
     # Loading the model and possibly initial weights
     model = models.dense_net1
     if args.initial_weights is not None:
-        model = load_weights(model, os.path.join(PATH, args.initial_weights))
+        model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['1']
     else:
         freeze_layers = None
 
     # Device selection
-    if args.device is None:
-        if torch.cuda.is_available():
-            device = 'cuda'
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
-        else:
-            device = 'cpu'
-    elif args.device == 'cuda':
-        if torch.cuda.is_available():
-            device = 'cuda'
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
-        else:
-            device = 'cpu'
-    else:
-        device = 'cpu'
-
-    # Move the model to the selected device
+    device = utils.get_device(args.device)
+    logging.info("Device set to '{}'.".format(device))
     model.to(device)
 
     # Loading the dataset and creating the data loaders and transforms
@@ -140,7 +125,7 @@ def main(args: Namespace, params: dict):
 
     # Metrics
     UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
-    if device == 'cuda':
+    if args.gpu_metric and device == 'cuda':
         GpuInfo().attach(trainer.engine, name='gpu')
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
@@ -216,6 +201,8 @@ if __name__ == '__main__':
                         help='model weights to initialize training')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'],
                         help="'cuda' (GPU) or 'cpu'")
+    parser.add_argument('--gpu_metric', action='store_true', default=False,
+                        help='enable gpu metric in progress bar')
     args_ = parser.parse_args()
 
     with open(os.path.join(PATH, args_.json)) as f:

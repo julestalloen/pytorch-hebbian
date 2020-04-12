@@ -44,19 +44,6 @@ class Trainer(ABC):
 
         self._register_handlers()
 
-    @staticmethod
-    def _get_device(device):
-        if device is None:
-            if torch.cuda.is_available():
-                device = 'cuda'
-                # Make sure all newly created tensors are cuda tensors
-                torch.set_default_tensor_type('torch.cuda.FloatTensor')
-            else:
-                device = 'cpu'
-
-        logging.info("Device set to '{}'.".format(device))
-        return device
-
     def _register_handlers(self):
         if self.visualizer is not None:
             @self.engine.on(Events.STARTED)
@@ -131,7 +118,7 @@ class SupervisedTrainer(Trainer):
 
     def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, train_evaluator=None, evaluator=None,
                  visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
-        engine = create_supervised_trainer(model, optimizer, criterion, device=self._get_device(device))
+        engine = create_supervised_trainer(model, optimizer, criterion, device=utils.get_device(device))
         RunningAverage(output_transform=lambda x: x).attach(engine, 'loss')
 
         super().__init__(engine=engine, model=model, evaluator=evaluator, train_evaluator=train_evaluator,
@@ -165,9 +152,7 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
-        device = self._get_device(device)
-        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
-        model.to(device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=utils.get_device(device))
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
         if self.freeze_layers is None:
