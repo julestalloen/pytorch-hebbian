@@ -29,12 +29,7 @@ def main(params):
     # Loading the model and possibly initial weights
     model = models.dense_net1
     weights_path = "../output/models/heb-20200412-192544_m_600_acc=0.8421666666666666.pth"
-    layer_names = ['1']
-    model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=layer_names)
-    for layer in [dict(model.named_children())[k] for k in layer_names]:
-        for param in layer.parameters():
-            param.requires_grad = False
-    logging.info("Freezed layer(s) {}.".format(layer_names))
+    model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
@@ -79,16 +74,16 @@ def main(params):
                                              lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
 
     # Early stopping
-    handler = EarlyStopping(patience=10, score_function=lambda engine: engine.state.metrics['accuracy'],
-                            trainer=trainer.engine, cumulative_delta=True)
-    eval_to_monitor.engine.add_event_handler(Events.COMPLETED, handler)
-    handler.logger.setLevel(logging.INFO)
+    es_handler = EarlyStopping(patience=10, score_function=lambda engine: engine.state.metrics['accuracy'],
+                               trainer=trainer.engine, cumulative_delta=True)
+    eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
+    es_handler.logger.setLevel(logging.INFO)
 
     # Model checkpoints
-    handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
-                              score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
-                              global_step_transform=global_step_from_engine(trainer.engine))
-    eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, handler, {'m': model})
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+                                 score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
+                                 global_step_transform=global_step_from_engine(trainer.engine))
+    eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2,
@@ -96,7 +91,7 @@ def main(params):
 
     if not params['train_all']:
         # Save the final parameters with its corresponding metrics
-        visualizer.writer.add_hparams(params, evaluator.metrics)
+        visualizer.writer.add_hparams(params, {'hparam/accuracy': es_handler.best_score})
 
 
 if __name__ == '__main__':

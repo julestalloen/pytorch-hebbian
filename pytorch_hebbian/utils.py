@@ -55,7 +55,7 @@ def prepare_batch(batch, device=None, non_blocking=False):
             convert_tensor(y, device=device, non_blocking=non_blocking))
 
 
-def load_weights(model, state_dict_path, layer_names=None):
+def load_weights(model, state_dict_path, layer_names=None, freeze=False):
     """Load model weights from a stored state dict. Optionally only load weights for the specified layer."""
     if torch.cuda.is_available():
         device = 'cuda'
@@ -69,6 +69,12 @@ def load_weights(model, state_dict_path, layer_names=None):
 
     model.load_state_dict(state_dict, strict=False)
     logging.info("Loaded initial model weights for layer(s) {} from '{}'.".format(layer_names, state_dict_path))
+
+    if freeze:
+        for layer in [dict(model.named_children())[k] for k in layer_names]:
+            for param in layer.parameters():
+                param.requires_grad = False
+        logging.info("Freezed layer(s) {}.".format(layer_names))
 
     return model
 
@@ -95,5 +101,8 @@ def get_device(device=None):
             device = 'cpu'
     else:
         device = 'cpu'
+
+    if device == 'cuda':
+        logging.info("CUDA device set to '{}'.".format(torch.cuda.get_device_name(0)))
 
     return device
