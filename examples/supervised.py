@@ -28,12 +28,13 @@ def main(params):
 
     # Loading the model and possibly initial weights
     model = models.dense_net1
-    # weights_path = "models/heb-20200408-193344_m_1000_acc=0.929-1.weight.pth"
-    # state_dict_path = os.path.join(PATH, weights_path)
-    # model = load_weights(model, state_dict_path)
-    # for param in list(model.children())[1].parameters():
-    #     param.requires_grad = False
-    # print("Freezed", list(model.children())[1])
+    weights_path = "../output/models/heb-20200412-192544_m_600_acc=0.8421666666666666.pth"
+    layer_names = ['1']
+    model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=layer_names)
+    for layer in [dict(model.named_children())[k] for k in layer_names]:
+        for param in layer.parameters():
+            param.requires_grad = False
+    logging.info("Freezed layer(s) {}.".format(layer_names))
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([

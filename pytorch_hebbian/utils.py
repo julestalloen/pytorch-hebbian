@@ -1,4 +1,5 @@
-import os
+import logging
+from typing import List
 
 import numpy as np
 import torch
@@ -54,41 +55,29 @@ def prepare_batch(batch, device=None, non_blocking=False):
             convert_tensor(y, device=device, non_blocking=non_blocking))
 
 
-def load_weights(model, state_dict_path):
+def load_weights(model, state_dict_path, layer_names=None):
+    """Load model weights from a stored state dict. Optionally only load weights for the specified layer."""
     if torch.cuda.is_available():
         device = 'cuda'
     else:
         device = 'cpu'
 
     state_dict = torch.load(state_dict_path, map_location=torch.device(device))
-    model.load_state_dict(state_dict, strict=False)
 
-    print("Loaded initial model weights from '{}'.".format(state_dict_path))
+    if layer_names is not None:
+        state_dict = extract_layers_from_state_dict(state_dict, layers=layer_names)
+
+    model.load_state_dict(state_dict, strict=False)
+    logging.info("Loaded initial model weights for layer(s) {} from '{}'.".format(layer_names, state_dict_path))
 
     return model
 
 
-def extract_layer_from_state_dict(state_dict_path: str, layer: str, device=None):
-    """Extract a layer from a state dict and save as a new state dict."""
-    state_dict_dir = os.path.dirname(state_dict_path)
-    basename = os.path.splitext(os.path.basename(state_dict_path))
-    state_dict_name = basename[0]
-    state_dict_ext = basename[1]
-
-    if device is None:
-        if torch.cuda.is_available():
-            device = 'cuda'
-        else:
-            device = 'cpu'
-
-    state_dict = torch.load(state_dict_path, map_location=torch.device(device))
-    weight_name = '{}.weight'.format(layer)
-    new_state_dict = {weight_name: state_dict[weight_name]}
-    print('Old state dict keys: {}.'.format(state_dict.keys()))
-    print('New state dict keys: {}.'.format(new_state_dict.keys()))
-    output_path = os.path.join(state_dict_dir, "{}-{}{}".format(state_dict_name, weight_name, state_dict_ext))
-    torch.save(new_state_dict, output_path)
-    print("New state dict saved to '{}'.".format(output_path))
+def extract_layers_from_state_dict(state_dict: dict, layers: List[str]):
+    """Extract layers from a state dict."""
+    layer_weights = ['{}.weight'.format(layer) for layer in layers]
+    new_state_dict = {layer_weight: state_dict[layer_weight] for layer_weight in layer_weights}
+    return new_state_dict
 
 
 def get_device(device=None):

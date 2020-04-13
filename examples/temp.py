@@ -12,14 +12,14 @@ def imshow(img):
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.axis('off')
-    plt.savefig('mnist_digits-examples.png', bbox_inches='tight', pad_inches=0, transparent=True, quality=95)
+    plt.savefig('mnist-fashion-examples.png', bbox_inches='tight', pad_inches=0, transparent=True, quality=95)
     plt.show()
 
 
 transform = transforms.Compose([
     transforms.ToTensor(),
 ])
-dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
 
 num = 20
 images = torch.ByteTensor()
