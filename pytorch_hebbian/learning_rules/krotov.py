@@ -31,24 +31,21 @@ class KrotovsRule(LearningRule):
         logging.debug('Received weights with shape {}'.format(weights.shape))
 
         batch_size = inputs.shape[0]
-        hid = weights.shape[0]
+        num_hidden_units = weights.shape[0]
         input_size = inputs[0].shape[0]
         inputs = torch.t(inputs)
+        assert (self.k <= num_hidden_units), "The amount of hidden units should be larger or equal to k!"
 
-        assert (self.k <= hid), "The amount of hidden units should be larger or equal to k!"
+        tot_input = torch.matmul(torch.sign(weights) * torch.abs(weights) ** (self.norm - 1), inputs)
 
-        sig = torch.sign(weights)
-        tot_input = torch.matmul(sig * torch.abs(weights) ** (self.norm - 1), inputs)
+        y = torch.argsort(tot_input, dim=0)
+        activations = torch.zeros((num_hidden_units, batch_size))
+        activations[y[num_hidden_units - 1, :], torch.arange(batch_size)] = 1.0
+        activations[y[num_hidden_units - self.k], torch.arange(batch_size)] = -self.delta
 
-        y = torch.argsort(tot_input, dim=0)  # fast implementation -> ranking of currents
-        yl = torch.zeros((hid, batch_size))  # activations of post synaptic cells, g(Q) in [3], see also [9] and [10]
-        yl[y[hid - 1, :], torch.arange(batch_size)] = 1.0  # see [10]
-        yl[y[hid - self.k], torch.arange(batch_size)] = -self.delta
-
-        xx = torch.sum(torch.mul(yl, tot_input), 1)
-        # ds is the right hand side of eq [3]
-        temp = torch.mul(xx.view(xx.shape[0], 1).repeat((1, input_size)), weights)
-        ds = torch.matmul(yl, torch.t(inputs)) - temp
+        xx = torch.sum(torch.mul(activations, tot_input), 1)
+        norm_factor = torch.mul(xx.view(xx.shape[0], 1).repeat((1, input_size)), weights)
+        ds = torch.matmul(activations, torch.t(inputs)) - norm_factor
 
         nc = torch.max(torch.abs(ds))
         if nc < self.precision:
