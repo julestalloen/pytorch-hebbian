@@ -12,7 +12,7 @@ VIDEOS_DIR = os.path.join(OUTPUT_DIR, 'videos')
 TENSORBOARD_DIR = os.path.join(OUTPUT_DIR, 'tensorboard', 'runs')
 TQDM_BAR_FORMAT = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]'
 IGNITE_BAR_FORMAT = '{desc}[{n_fmt}/{total_fmt}] {percentage:3.0f}%|{bar}|{postfix} [{elapsed}<{remaining}]'
-METRICS_REPORT_FORMAT = " epoch {0}: Avg accuracy: {accuracy:.4f}, Avg loss: {loss:.4f}"
+METRICS_REPORT_FORMAT = " epoch {0}: Avg accuracy: {accuracy:.4f}, Avg loss: {loss:.4e}"
 EVAL_REPORT_FORMAT = "Validation" + METRICS_REPORT_FORMAT
 TRAIN_REPORT_FORMAT = "Training" + METRICS_REPORT_FORMAT
 

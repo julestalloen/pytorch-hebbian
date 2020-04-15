@@ -7,7 +7,7 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
-class RePU(nn.Module):
+class RePU(nn.ReLU):
     def __init__(self, n):
         super(RePU, self).__init__()
         self.n = n

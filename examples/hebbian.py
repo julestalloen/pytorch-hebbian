@@ -143,7 +143,6 @@ def main(args: Namespace, params: dict):
     def log_learning_rate(engine):
         visualizer.writer.add_scalar('learning_rate', lr_scheduler.get_param(), engine.state.epoch - 1)
 
-    # @trainer.engine.on(Events.STARTED)
     @trainer.engine.on(Events.EPOCH_COMPLETED)
     def log_unit_convergence(engine):
         weights = model[1].weight.detach()
@@ -191,7 +190,7 @@ def main(args: Namespace, params: dict):
     #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=200)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
 
     # Save the final parameters with its corresponding metrics
     visualizer.writer.add_hparams(params, evaluator.metrics)
