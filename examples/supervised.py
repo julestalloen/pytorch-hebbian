@@ -27,8 +27,8 @@ def main(params):
         logging.info('Training on all train data!')
 
     # Loading the model and possibly initial weights
-    model = models.dense_net1
-    weights_path = "../output/models/heb-20200412-192544_m_600_acc=0.8421666666666666.pth"
+    model = models.create_model(2000, params['n'])
+    weights_path = "../output/models/heb-20200415-083933_m_500_acc=0.84475.pth"
     model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
     # Loading the dataset and creating the data loaders and transforms
@@ -75,7 +75,7 @@ def main(params):
 
     # Early stopping
     es_handler = EarlyStopping(patience=10, score_function=lambda engine: engine.state.metrics['accuracy'],
-                               trainer=trainer.engine, cumulative_delta=True)
+                               trainer=trainer.engine, cumulative_delta=True, min_delta=0.001)
     eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
     es_handler.logger.setLevel(logging.INFO)
 
@@ -93,18 +93,29 @@ def main(params):
         # Save the final parameters with its corresponding metrics
         visualizer.writer.add_hparams(params, {'hparam/accuracy': es_handler.best_score})
 
+    return es_handler.best_score
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
-        'train_batch_size': 128,
+        'train_batch_size': 64,
         'val_batch_size': 512,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-4,
+        'lr': 1e-5,
         "train_all": False,
     }
 
-    main(params_)
+    results = []
+    param_range = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
+    for n in param_range:
+        print("Currently evaluating n={}.".format(n))
+        params_['n'] = n
+        results.append(main(params_))
+
+    print(results)
+
+    # main(params_)

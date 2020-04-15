@@ -44,3 +44,12 @@ conv_net2 = nn.Sequential(
     Flatten(),
     nn.Linear(num_kernels[1] * int(((input_dim - (kernel_size - 1)) / 2 - (kernel_size - 1)) / 2) ** 2, 10)
 )
+
+
+def create_model(hu, n):
+    return nn.Sequential(
+        Flatten(),
+        nn.Linear(784, hu, bias=False),
+        RePU(n),
+        nn.Linear(hu, 10),
+    )

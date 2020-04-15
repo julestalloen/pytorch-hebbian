@@ -88,7 +88,7 @@ def main(args: Namespace, params: dict):
         # h_criterion = SPELoss(2)
         h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
-        h_optimizer = torch.optim.Adam(params=h_model.parameters())
+        h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-4)
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=4,
                                                                     factor=0.2)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,

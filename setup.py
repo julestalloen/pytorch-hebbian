@@ -22,7 +22,7 @@ setuptools.setup(
     install_requires=[
         'torch==1.4.0',
         'torchvision==0.5.0',
-        'tensorboard==2.1.0',
+        'tensorboard==2.2.0',
         'pytorch-ignite',
         'matplotlib',
         'numpy',

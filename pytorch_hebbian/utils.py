@@ -1,11 +1,16 @@
 import logging
 from typing import List
 
+import matplotlib
 import numpy as np
 import torch
 from ignite.utils import convert_tensor
 from matplotlib import pyplot as plt
 from torch.utils.data import random_split
+
+# TODO: find better fix
+#   https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+matplotlib.use('Agg')
 
 
 def plot_to_img(fig):

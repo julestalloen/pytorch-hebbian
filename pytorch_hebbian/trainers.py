@@ -5,13 +5,14 @@ from collections import namedtuple
 from typing import Union, Optional, Dict, List, Callable, Sequence
 
 import torch
-from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.handlers import ProgressBar, global_step_from_engine
 from ignite.engine import Engine, Events, create_supervised_trainer
 from ignite.metrics import RunningAverage
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from pytorch_hebbian import utils, config
+from pytorch_hebbian.handlers.tqdm_logger import TqdmLogger, OutputHandler
 from pytorch_hebbian.learning_rules import LearningRule
 from pytorch_hebbian.visualizers import Visualizer
 
@@ -41,6 +42,7 @@ class Trainer(ABC):
 
         self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
         self.pbar.attach(self.engine, metric_names='all')
+        self.tqdm_logger = TqdmLogger(pbar=self.pbar)
 
         self._register_handlers()
 
@@ -54,29 +56,34 @@ class Trainer(ABC):
                     self.visualizer.visualize_weights(self.model, input_shape, engine.state.epoch)
 
         if self.train_evaluator is not None:
+            self.tqdm_logger.attach(self.train_evaluator.engine,
+                                    log_handler=OutputHandler(tag="train",
+                                                              global_step_transform=global_step_from_engine(
+                                                                  self.engine)),
+                                    event_name=Events.EPOCH_COMPLETED)
+
             @self.engine.on(Events.EPOCH_COMPLETED)
             def log_training_results(engine):
                 if engine.state.epoch % self.eval_every == 0:
                     self.train_evaluator.run(self.train_loader)
-                    metrics = self.train_evaluator.metrics
-
-                    self.pbar.log_message(config.TRAIN_REPORT_FORMAT.format(engine.state.epoch, **metrics))
 
                     if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(metrics, engine.state.epoch, train=True)
+                        self.visualizer.visualize_metrics(self.train_evaluator.metrics, engine.state.epoch, train=True)
 
         if self.evaluator is not None:
+            self.tqdm_logger.attach(self.evaluator.engine,
+                                    log_handler=OutputHandler(tag="validation",
+                                                              global_step_transform=global_step_from_engine(
+                                                                  self.engine)),
+                                    event_name=Events.EPOCH_COMPLETED)
+
             @self.engine.on(Events.EPOCH_COMPLETED)
             def log_validation_results(engine):
                 if engine.state.epoch % self.eval_every == 0:
                     self.evaluator.run(**self.evaluator_args())
-                    metrics = self.evaluator.metrics
-
-                    self.pbar.log_message(config.EVAL_REPORT_FORMAT.format(engine.state.epoch, **metrics))
-                    self.pbar.n = self.pbar.last_print_n = 0
 
                     if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(metrics, engine.state.epoch)
+                        self.visualizer.visualize_metrics(self.evaluator.metrics, engine.state.epoch)
 
     def run(self, train_loader: DataLoader, val_loader: DataLoader, epochs: int, eval_every=1, vis_weights_every=-1):
         self.train_loader = train_loader
