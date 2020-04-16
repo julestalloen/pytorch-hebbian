@@ -55,8 +55,8 @@ def main(args: Namespace, params: dict):
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
 
     # Analyze dataset
     data_batch = next(iter(train_loader))[0]
@@ -85,7 +85,6 @@ def main(args: Namespace, params: dict):
     # Initialization function called before each evaluation run of the Hebbian evaluator
     def init_function(h_model):
         h_criterion = torch.nn.CrossEntropyLoss()
-        # h_criterion = SPELoss(2)
         h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-4)

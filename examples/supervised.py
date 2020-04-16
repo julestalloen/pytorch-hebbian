@@ -45,8 +45,8 @@ def main(params):
         val_loader = None
     else:
         train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True, pin_memory=True)
-        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False, pin_memory=True)
+        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run)
@@ -86,7 +86,7 @@ def main(params):
     eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=5)
 
     if not params['train_all']:
         # Save the final parameters with its corresponding metrics
