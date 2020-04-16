@@ -55,8 +55,8 @@ def main(args: Namespace, params: dict):
     # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False, pin_memory=True)
 
     # Analyze dataset
     data_batch = next(iter(train_loader))[0]
@@ -193,7 +193,7 @@ def main(args: Namespace, params: dict):
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
 
     # Save the final parameters with its corresponding metrics
-    visualizer.writer.add_hparams(params, evaluator.metrics)
+    visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
 
 
 if __name__ == '__main__':

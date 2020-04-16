@@ -100,11 +100,11 @@ if __name__ == '__main__':
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
-        'train_batch_size': 128,
-        'val_batch_size': 512,
+        'train_batch_size': 100,
+        'val_batch_size': 100,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-4,
+        'lr': 1e-5,
         "train_all": False,
     }
 
