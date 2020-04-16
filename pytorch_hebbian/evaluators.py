@@ -44,6 +44,7 @@ class HebbianEvaluator:
         self.epochs = epochs
         self.supervised_from = supervised_from
         self.supervised_eval_every = supervised_eval_every
+        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
         self.engine = self.create_hebbian_evaluator(self._run)
         self._init_metrics()
@@ -85,7 +86,7 @@ class HebbianEvaluator:
             if self.best_score is None or current_score > self.best_score:
                 self.best_score = current_score
                 self.engine.state.metrics = eval_engine.state.metrics
-                logging.info("New best validation {} = {:.4f}.".format(self.score_name, self.best_score))
+                self.logger.info("New best validation {} = {:.4f}.".format(self.score_name, self.best_score))
 
         self._init_metrics()
 
@@ -94,7 +95,7 @@ class HebbianEvaluator:
         #   parameter was manually passed on creation of the evaluator
         if self.supervised_from is not None:
             supervised_from = self.supervised_from
-        logging.info(
+        self.logger.info(
             "Supervised training from layer '{}'.".format(list(self.model.named_children())[supervised_from][0]))
 
         self._init()

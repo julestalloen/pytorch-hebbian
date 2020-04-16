@@ -99,8 +99,7 @@ def main(args: Namespace, params: dict):
                                              lambda engine: h_lr_scheduler.step(engine.state.metrics['accuracy']))
 
         # Model checkpoints
-        h_handler = ModelCheckpoint(config.MODELS_DIR, 'heb-' + identifier, n_saved=1, create_dir=True,
-                                    require_empty=False,
+        h_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
                                     score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
                                     global_step_transform=global_step_from_engine(trainer.engine))
         h_evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, h_handler, {'m': model})
@@ -137,6 +136,10 @@ def main(args: Namespace, params: dict):
 
     # Adding handlers for learning rate scheduling, model checkpoints and visualizing
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
+
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+                                 global_step_transform=global_step_from_engine(trainer.engine))
+    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
     @trainer.engine.on(Events.EPOCH_STARTED)
     def log_learning_rate(engine):

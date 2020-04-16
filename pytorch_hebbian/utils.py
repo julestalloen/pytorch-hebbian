@@ -12,6 +12,8 @@ from torch.utils.data import random_split
 #   https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
 matplotlib.use('Agg')
 
+logger = logging.getLogger(__name__)
+
 
 def plot_to_img(fig):
     """Takes a matplotlib figure handle and converts it using canvas and string-casts to a numpy array that can be
@@ -73,13 +75,13 @@ def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = No
         state_dict = extract_layers_from_state_dict(state_dict, layers=layer_names)
 
     model.load_state_dict(state_dict, strict=False if layer_names is not None else True)
-    logging.info("Loaded initial model weights for layer(s) {} from '{}'.".format(layer_names, state_dict_path))
+    logger.info("Loaded initial model weights for layer(s) {} from '{}'.".format(layer_names, state_dict_path))
 
     if freeze:
         for layer in [dict(model.named_children())[k] for k in layer_names]:
             for param in layer.parameters():
                 param.requires_grad = False
-        logging.info("Freezed layer(s) {}.".format(layer_names))
+        logger.info("Freezed layer(s) {}.".format(layer_names))
 
     return model
 
@@ -108,6 +110,6 @@ def get_device(device=None):
         device = 'cpu'
 
     if device == 'cuda':
-        logging.info("CUDA device set to '{}'.".format(torch.cuda.get_device_name(0)))
+        logger.info("CUDA device set to '{}'.".format(torch.cuda.get_device_name(0)))
 
     return device

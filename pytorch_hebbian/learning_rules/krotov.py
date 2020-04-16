@@ -1,20 +1,21 @@
-import logging
-
 import torch
 
 from .learning_rule import LearningRule
 
 
 class KrotovsRule(LearningRule):
+    """Krotov-Hopfield Hebbian learning rule fast implementation.
+
+    Original source: https://github.com/DimaKrotov/Biological_Learning
+
+    Args:
+        precision: Numerical precision of the weight updates.
+        delta: Anti-hebbian learning strength.
+        norm: Lebesgue norm of the weights.
+        k: Ranking parameter
+    """
 
     def __init__(self, precision=1e-30, delta=0.4, norm=2, k=2):
-        """
-        Create a Krotov learning rule.
-        :param precision: numerical precision of the weight updates
-        :param delta: strength of the anti-hebbian learning
-        :param norm: Lebesgue norm of the weights
-        :param k: ranking param
-        """
         super().__init__()
         self.precision = precision
         self.delta = delta
@@ -27,8 +28,8 @@ class KrotovsRule(LearningRule):
                 layer.weight.data.normal_(mean=0.0, std=1.0)
 
     def update(self, inputs: torch.Tensor, weights: torch.Tensor):
-        logging.debug('Received inputs with shape {}'.format(inputs.shape))
-        logging.debug('Received weights with shape {}'.format(weights.shape))
+        self.logger.debug('Received inputs with shape {}'.format(inputs.shape))
+        self.logger.debug('Received weights with shape {}'.format(weights.shape))
 
         batch_size = inputs.shape[0]
         num_hidden_units = weights.shape[0]
@@ -36,9 +37,13 @@ class KrotovsRule(LearningRule):
         inputs = torch.t(inputs)
         assert (self.k <= num_hidden_units), "The amount of hidden units should be larger or equal to k!"
 
+        # Calculate overlap with data
         tot_input = torch.matmul(torch.sign(weights) * torch.abs(weights) ** (self.norm - 1), inputs)
 
+        # Sorting the activation strengths
         y = torch.argsort(tot_input, dim=0)
+
+        # Activations of post-synaptic neurons
         activations = torch.zeros((num_hidden_units, batch_size))
         activations[y[num_hidden_units - 1, :], torch.arange(batch_size)] = 1.0
         activations[y[num_hidden_units - self.k], torch.arange(batch_size)] = -self.delta

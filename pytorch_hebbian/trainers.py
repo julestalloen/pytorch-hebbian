@@ -34,6 +34,7 @@ class Trainer(ABC):
         self.val_loader = None
         self.eval_every = None
         self.vis_weights_every = None
+        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
         if evaluator_args is None:
             self.evaluator_args = lambda: {'val_loader': self.val_loader}
@@ -97,17 +98,17 @@ class Trainer(ABC):
             self.vis_weights_every = vis_weights_every
 
         if self.val_loader is not None:
-            logging.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
-                                                                                  len(val_loader.dataset)))
+            self.logger.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
+                                                                                      len(val_loader.dataset)))
         else:
-            logging.info('Received {} training samples.'.format(len(train_loader.dataset)))
+            self.logger.info('Received {} training samples.'.format(len(train_loader.dataset)))
         if self.evaluator is not None:
             info_str = 'Training {} epoch(s), evaluating every {} epoch(s).'.format(epochs, self.eval_every)
         else:
             info_str = 'Training {} epoch(s).'.format(epochs)
-        logging.info(info_str)
+        self.logger.info(info_str)
         if self.visualizer is not None:
-            logging.info('Visualizing weights every {} iterations(s).'.format(self.vis_weights_every))
+            self.logger.info('Visualizing weights every {} iterations(s).'.format(self.vis_weights_every))
 
         self.engine.run(train_loader, max_epochs=epochs)
 
@@ -173,8 +174,6 @@ class HebbianTrainer(Trainer):
             if (type(layer) == torch.nn.Linear or type(layer) == torch.nn.Conv2d) and name not in self.freeze_layers:
                 self.layers.append(Layer(idx, name, layer))
 
-        logging.info("Received {} trainable layer(s): {}.".format(len(self.layers), [lyr.name for lyr in self.layers]))
-
         # Initialize layer weights according to the learning rule
         self.learning_rule = learning_rule
         if type(self.learning_rule) == dict:
@@ -190,8 +189,10 @@ class HebbianTrainer(Trainer):
                              'supervised_from': self.supervised_from,
                          })
 
-    @staticmethod
-    def _prepare_data(inputs, model, layer_index):
+        self.logger.info(
+            "Received {} trainable layer(s): {}.".format(len(self.layers), [lyr.name for lyr in self.layers]))
+
+    def _prepare_data(self, inputs, model, layer_index):
         """Prepare the inputs and layer weights to be passed to the learning rule.
 
         Args:
@@ -222,7 +223,7 @@ class HebbianTrainer(Trainer):
             raise TypeError("Unsupported layer type!")
 
         x = x.view((x.shape[0], -1))
-        logging.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
+        self.logger.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
         return x, w
 
     def create_hebbian_trainer(self, model: torch.nn.Module, learning_rule, optimizer, device=None, non_blocking=False,
@@ -235,14 +236,14 @@ class HebbianTrainer(Trainer):
 
                 # Train layer per layer
                 for layer_index, layer_name, layer in self.layers:
-                    logging.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
+                    self.logger.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
                     inputs, weights = self._prepare_data(x, model, layer_index)
 
                     if type(learning_rule) == dict:
                         try:
                             rule = learning_rule[layer_name]
                         except KeyError:
-                            logging.error("No learning rule was specified for layer '{}'!".format(layer_name))
+                            self.logger.error("No learning rule was specified for layer '{}'!".format(layer_name))
                             raise
                     else:
                         rule = learning_rule

@@ -55,7 +55,7 @@ def main(params):
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=4, factor=0.2)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=4, factor=0.5)
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     if params['train_all']:
         evaluator = None
@@ -74,10 +74,10 @@ def main(params):
                                              lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
 
     # Early stopping
-    es_handler = EarlyStopping(patience=10, score_function=lambda engine: engine.state.metrics['accuracy'],
+    es_handler = EarlyStopping(patience=15, score_function=lambda engine: engine.state.metrics['accuracy'],
                                trainer=trainer.engine, cumulative_delta=True, min_delta=0.001)
     eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
-    es_handler.logger.setLevel(logging.INFO)
+    es_handler.logger.setLevel(logging.DEBUG)
 
     # Model checkpoints
     mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
@@ -86,7 +86,7 @@ def main(params):
     eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=5)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
 
     if not params['train_all']:
         # Save the final parameters with its corresponding metrics
