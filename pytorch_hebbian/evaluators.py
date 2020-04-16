@@ -2,19 +2,38 @@ import logging
 from typing import Callable
 
 import torch
-from ignite.engine import Events
-from ignite.engine import create_supervised_evaluator
+from ignite.engine import Events, Engine, State, create_supervised_evaluator
 from ignite.handlers import EarlyStopping
 from ignite.metrics import Accuracy, Loss
 
 from pytorch_hebbian.trainers import SupervisedTrainer
 
 
+class CustomEngine(Engine):
+    """Custom engine with custom run function.
+
+    This engine has only metrics in its state and only fires 2 events.
+    """
+
+    def __init__(self, run_function: Callable):
+        super().__init__(process_function=lambda x, y: None)
+        self._allowed_events = [Events.STARTED, Events.COMPLETED]
+        self._run_function = run_function
+
+    def run(self, *args, **kwargs):
+        if self.state is None:
+            self.state = State()
+
+        self._fire_event(Events.STARTED)
+        self._run_function(*args, **kwargs)
+        self._fire_event(Events.COMPLETED)
+
+
 class HebbianEvaluator:
 
     def __init__(self, model: torch.nn.Module, score_name: str, score_function: Callable,
-                 init_function: Callable[[], tuple] = None, epochs: int = 100, supervised_from: int = None,
-                 supervised_eval_every: int = 5):
+                 init_function: Callable[[torch.nn.Module], tuple] = None, epochs: int = 100,
+                 supervised_from: int = None, supervised_eval_every: int = 5):
         self.model = model
         self.score_name = score_name
         self.score_function = score_function
@@ -26,7 +45,12 @@ class HebbianEvaluator:
         self.supervised_from = supervised_from
         self.supervised_eval_every = supervised_eval_every
 
+        self.engine = self.create_hebbian_evaluator(self._run)
         self._init_metrics()
+
+    @staticmethod
+    def create_hebbian_evaluator(run_function) -> Engine:
+        return CustomEngine(run_function=run_function)
 
     @staticmethod
     def _init_function(model):
@@ -48,7 +72,7 @@ class HebbianEvaluator:
         return trainer, evaluator
 
     def _init_metrics(self):
-        self.metrics = {}
+        # self.metrics = {}
         self.best_score = None
 
     def _init(self):
@@ -56,16 +80,16 @@ class HebbianEvaluator:
 
         # Metric history saving
         @self._evaluator.engine.on(Events.COMPLETED)
-        def save_best_metrics(engine):
-            current_score = self.score_function(engine)
+        def save_best_metrics(eval_engine):
+            current_score = self.score_function(eval_engine)
             if self.best_score is None or current_score > self.best_score:
                 self.best_score = current_score
-                self.metrics = engine.state.metrics
+                self.engine.state.metrics = eval_engine.state.metrics
                 logging.info("New best validation {} = {:.4f}.".format(self.score_name, self.best_score))
 
         self._init_metrics()
 
-    def run(self, train_loader, val_loader, supervised_from):
+    def _run(self, train_loader, val_loader, supervised_from):
         # Normally the trainer passes the supervised_from parameter to the evaluator. This value is overwritten if the
         #   parameter was manually passed on creation of the evaluator
         if self.supervised_from is not None:
@@ -90,6 +114,9 @@ class HebbianEvaluator:
 
         self._trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
                           eval_every=self.supervised_eval_every)
+
+    def run(self, *args, **kwargs):
+        self.engine.run(*args, **kwargs)
 
 
 class SupervisedEvaluator:

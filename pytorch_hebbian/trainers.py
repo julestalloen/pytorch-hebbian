@@ -60,7 +60,7 @@ class Trainer(ABC):
                                     log_handler=OutputHandler(tag="train",
                                                               global_step_transform=global_step_from_engine(
                                                                   self.engine)),
-                                    event_name=Events.EPOCH_COMPLETED)
+                                    event_name=Events.COMPLETED)
 
             @self.engine.on(Events.EPOCH_COMPLETED)
             def log_training_results(engine):
@@ -68,14 +68,15 @@ class Trainer(ABC):
                     self.train_evaluator.run(self.train_loader)
 
                     if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(self.train_evaluator.metrics, engine.state.epoch, train=True)
+                        self.visualizer.visualize_metrics(self.train_evaluator.engine.state.metrics,
+                                                          engine.state.epoch, train=True)
 
         if self.evaluator is not None:
             self.tqdm_logger.attach(self.evaluator.engine,
                                     log_handler=OutputHandler(tag="validation",
                                                               global_step_transform=global_step_from_engine(
                                                                   self.engine)),
-                                    event_name=Events.EPOCH_COMPLETED)
+                                    event_name=Events.COMPLETED)
 
             @self.engine.on(Events.EPOCH_COMPLETED)
             def log_validation_results(engine):
@@ -83,7 +84,7 @@ class Trainer(ABC):
                     self.evaluator.run(**self.evaluator_args())
 
                     if self.visualizer is not None:
-                        self.visualizer.visualize_metrics(self.evaluator.metrics, engine.state.epoch)
+                        self.visualizer.visualize_metrics(self.evaluator.engine.state.metrics, engine.state.epoch)
 
     def run(self, train_loader: DataLoader, val_loader: DataLoader, epochs: int, eval_every=1, vis_weights_every=-1):
         self.train_loader = train_loader

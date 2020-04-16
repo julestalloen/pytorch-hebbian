@@ -27,8 +27,8 @@ def main(params):
         logging.info('Training on all train data!')
 
     # Loading the model and possibly initial weights
-    model = models.create_model(2000, params['n'])
-    weights_path = "../output/models/heb-20200415-083933_m_500_acc=0.84475.pth"
+    model = models.create_model(2000, n=params['n'])
+    weights_path = "../output/models/heb-20200415-083933_m_500_acc=0.84875.pth"
     model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
     # Loading the dataset and creating the data loaders and transforms
@@ -45,8 +45,8 @@ def main(params):
         val_loader = None
     else:
         train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False, pin_memory=True)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run)
@@ -86,8 +86,7 @@ def main(params):
     eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=2,
-                vis_weights_every=-1)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
 
     if not params['train_all']:
         # Save the final parameters with its corresponding metrics
@@ -101,11 +100,11 @@ if __name__ == '__main__':
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
-        'train_batch_size': 64,
+        'train_batch_size': 128,
         'val_batch_size': 512,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-5,
+        'lr': 1e-4,
         "train_all": False,
     }
 
@@ -114,7 +113,9 @@ if __name__ == '__main__':
     for n in param_range:
         print("Currently evaluating n={}.".format(n))
         params_['n'] = n
-        results.append(main(params_))
+        result = main(params_)
+        results.append(result)
+        print("Result={}.".format(result))
 
     print(results)
 
