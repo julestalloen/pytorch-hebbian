@@ -75,7 +75,7 @@ def main(params):
 
     # Early stopping
     es_handler = EarlyStopping(patience=15, score_function=lambda engine: engine.state.metrics['accuracy'],
-                               trainer=trainer.engine, cumulative_delta=True, min_delta=0.001)
+                               trainer=trainer.engine, cumulative_delta=True, min_delta=0.0001)
     eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
     es_handler.logger.setLevel(logging.DEBUG)
 

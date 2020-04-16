@@ -106,7 +106,7 @@ def main(args: Namespace, params: dict):
 
         # Early stopping
         h_es_handler = EarlyStopping(patience=10,
-                                     min_delta=0.001,
+                                     min_delta=0.0001,
                                      score_function=lambda engine: engine.state.metrics['accuracy'],
                                      trainer=h_trainer.engine, cumulative_delta=True)
         h_es_handler.logger.setLevel(logging.INFO)
