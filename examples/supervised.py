@@ -55,7 +55,7 @@ def main(params):
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=4, factor=0.5)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=10, factor=0.5)
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     if params['train_all']:
         evaluator = None
@@ -74,7 +74,7 @@ def main(params):
                                              lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
 
     # Early stopping
-    es_handler = EarlyStopping(patience=15, score_function=lambda engine: engine.state.metrics['accuracy'],
+    es_handler = EarlyStopping(patience=30, score_function=lambda engine: engine.state.metrics['accuracy'],
                                trainer=trainer.engine, cumulative_delta=True, min_delta=0.0001)
     eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
     es_handler.logger.setLevel(logging.DEBUG)
