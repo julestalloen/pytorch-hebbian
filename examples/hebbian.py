@@ -27,10 +27,12 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def main(args: Namespace, params: dict):
+def main(args: Namespace, params: dict, run_postfix=""):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
     run = 'heb-{}'.format(identifier)
+    if run_postfix:
+        run += '-' + run_postfix
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
@@ -51,8 +53,8 @@ def main(args: Namespace, params: dict):
         transforms.ToTensor(),
     ])
     # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
     # dataset = Subset(dataset, [i for i in range(10000)])
     train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
     train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
@@ -156,8 +158,7 @@ def main(args: Namespace, params: dict):
         plt.xlabel("{:.2f}% of hidden units 'converged'".format(engine.state.metrics['unit_conv'] * 100))
         plt.ylabel("Sum of incoming weights")
         fig.tight_layout()
-        image = utils.plot_to_img(fig)
-        visualizer.writer.add_image('unit_weight_sum', image, engine.state.epoch)
+        visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
 
     # @trainer.engine.on(Events.STARTED)
     # @trainer.engine.on(Events.EPOCH_COMPLETED)
@@ -194,8 +195,11 @@ def main(args: Namespace, params: dict):
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
 
-    # Save the final parameters with its corresponding metrics
-    visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
+    # # Save the final parameters with its corresponding metrics
+    # visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
+    #
+    # return evaluator.engine.state.metrics
+    return 0
 
 
 if __name__ == '__main__':
@@ -219,10 +223,20 @@ if __name__ == '__main__':
     with open(os.path.join(PATH, args_.json)) as f:
         params_ = json.load(f)['params']
 
-    logging.basicConfig(level=logging.DEBUG if args_.debug else logging.INFO, format=config.LOGGING_FORMAT)
-    logging.getLogger("ignite").setLevel(logging.WARNING)
+    logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
+    logging.getLogger("ignite").setLevel(logging.WARN)
+    logging.getLogger("pytorch_hebbian").setLevel(logging.DEBUG if args_.debug else logging.INFO)
 
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
+
+    # param_name = "norm"
+    # param_range = [9, 10, 11, 12]
+    # for param in param_range:
+    #     params_[param_name] = param
+    #
+    #     print("Investigating {}={}...".format(param_name, param))
+    #     metrics = main(args_, params_, run_postfix="p{}".format(param))
+    #     print(metrics)
 
     main(args_, params_)

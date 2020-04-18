@@ -28,7 +28,7 @@ def main(params):
 
     # Loading the model and possibly initial weights
     model = models.create_model(2000, n=params['n'])
-    weights_path = "../output/models/heb-20200415-083933_m_500_acc=0.84875.pth"
+    weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
     model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
     # Loading the dataset and creating the data loaders and transforms
@@ -97,7 +97,8 @@ def main(params):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
-    logging.getLogger("ignite").setLevel(logging.WARNING)
+    logging.getLogger("ignite").setLevel(logging.WARN)
+    logging.getLogger("pytorch_hebbian").setLevel(logging.INFO)
 
     params_ = {
         'train_batch_size': 100,
