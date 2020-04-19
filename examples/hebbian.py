@@ -193,7 +193,7 @@ def main(args: Namespace, params: dict, run_postfix=""):
     #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=1000)
 
     # # Save the final parameters with its corresponding metrics
     # visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
