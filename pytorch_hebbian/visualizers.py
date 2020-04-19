@@ -1,4 +1,5 @@
 import copy
+import logging
 import math
 import os
 from abc import ABC
@@ -31,6 +32,9 @@ class TensorBoardVisualizer(Visualizer):
 
     def __init__(self, run, log_dir=config.TENSORBOARD_DIR):
         self.writer = SummaryWriter(os.path.join(log_dir, run))
+        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
+
+        self.logger.info("Visualizer initiated for run '{}'.".format(run))
 
     def visualize_metrics(self, metrics, epoch: int, train=False):
         if train:
@@ -48,7 +52,7 @@ class TensorBoardVisualizer(Visualizer):
             first_trainable = True
             for idx, (name, layer) in enumerate(model.named_children()):
                 if type(layer) == torch.nn.Linear and first_trainable:
-                    # This only visualizes a Linear layer if it is the first layer after the input
+                    # Only visualize a Linear layer if it is the first layer after the input
                     weights = layer.weight.view(-1, *input_shape)
                     first_trainable = False
                 elif type(layer) == torch.nn.Conv2d:
