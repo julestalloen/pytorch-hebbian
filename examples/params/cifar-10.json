@@ -2,7 +2,7 @@
   "description": "Hebbian learning with Krotov rule params for cifar-10.",
   "params": {
     "train_batch_size": 1000,
-    "val_batch_size": 64,
+    "val_batch_size": 1000,
     "val_split": 0.2,
     "epochs": 1000,
     "delta": 0.2,
