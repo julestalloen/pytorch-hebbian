@@ -1,24 +1,9 @@
+from collections import OrderedDict
 from typing import List
 
 import torch.nn as nn
 
 from pytorch_hebbian.nn import Flatten, RePU
-
-hidden_units = 2000
-dense_net1_mnist = nn.Sequential(
-    Flatten(),
-    nn.Linear(28 ** 2, hidden_units, bias=False),
-    nn.BatchNorm1d(num_features=hidden_units),
-    RePU(1),
-    nn.Linear(hidden_units, 10),
-)
-
-dense_net1 = nn.Sequential(
-    Flatten(),
-    nn.Linear(32 ** 2 * 3, hidden_units, bias=False),
-    RePU(1),
-    nn.Linear(hidden_units, 10),
-)
 
 dense_net = nn.Sequential(
     Flatten(),
@@ -56,10 +41,16 @@ conv_net2 = nn.Sequential(
 )
 
 
-def create_fc1_model(hu: List, n: int = 1):
-    return nn.Sequential(
-        Flatten(),
-        nn.Linear(hu[0], hu[1], bias=False),
-        RePU(n),
-        nn.Linear(hu[1], 10),
-    )
+def create_fc1_model(hu: List, n: int = 1, batch_norm=False):
+    modules = [
+        ('flatten', Flatten()),
+        ('linear1', nn.Linear(hu[0], hu[1], bias=False))
+    ]
+
+    if batch_norm:
+        modules.append(('batch_norm', nn.BatchNorm1d(num_features=hu[1])))
+
+    modules.append(('repu', RePU(n)))
+    modules.append(('linear2', nn.Linear(hu[1], 10)))
+
+    return nn.Sequential(OrderedDict(modules))

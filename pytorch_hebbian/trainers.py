@@ -211,6 +211,9 @@ class HebbianTrainer(Trainer):
             for lyr in layers[:layer_index]:
                 x = lyr(x)
 
+        # TODO: trigger forward hooks for remaining layers
+        model(inputs)
+
         # Get the layer weight and input image patches
         if type(layer) == torch.nn.Linear:
             w = layer.weight

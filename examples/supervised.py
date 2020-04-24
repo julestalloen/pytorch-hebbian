@@ -3,50 +3,38 @@ import os
 import time
 
 import torch
+from ignite.contrib.handlers.base_logger import global_step_from_engine
+from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.engine import Events
-from ignite.handlers import EarlyStopping, ModelCheckpoint, global_step_from_engine
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 
+import data
 import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import SupervisedEvaluator
+from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.trainers import SupervisedTrainer
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def main(params):
+def main(params, dataset_name):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'sup-{}'.format(identifier)
+    run = 'sup-{}-{}'.format(dataset_name, identifier)
     logging.info("Starting run '{}'.".format(run))
 
     if params['train_all']:
         logging.info('Training on all train data!')
 
     # Loading the model and possibly initial weights
-    model = models.dense_net1_mnist
+    model = models.create_fc1_model([28 ** 2, 2000], batch_norm=True)
     weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
     model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
-    # Loading the dataset and creating the data loaders and transforms
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = Subset(dataset, [i for i in range(10000)])
-
-    if params['train_all']:
-        train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = None
-    else:
-        train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
+    # Data loaders
+    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run)
@@ -85,6 +73,22 @@ def main(params):
                                  global_step_transform=global_step_from_engine(trainer.engine))
     eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
+    # TensorBoard logger
+    tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
+    tb_logger.writer = visualizer.writer
+    tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model, layer_names=['linear1']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model, layer_names=['linear1']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=ActivationsScalarHandler(model, layer_names=['repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+
+    # We need to close the logger with we are done
+    tb_logger.close()
+
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
 
@@ -108,6 +112,7 @@ if __name__ == '__main__':
         'lr': 1e-4,
         "train_all": False,
     }
+    dataset_name_ = 'mnist-fashion'
 
     # results = []
     # param_range = [1]  # , 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
@@ -120,4 +125,4 @@ if __name__ == '__main__':
     #
     # print(results)
 
-    main(params_)
+    main(params_, dataset_name_)

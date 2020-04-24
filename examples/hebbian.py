@@ -7,17 +7,18 @@ from argparse import ArgumentParser, Namespace
 # from scipy import signal
 import torch
 from ignite.contrib.handlers import LRScheduler
+from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.contrib.metrics import GpuInfo
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
 # import numpy as np
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 
+import data
 import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
+from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
@@ -27,19 +28,89 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def main(args: Namespace, params: dict, run_postfix=""):
+def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer, params):
+    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
+
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+                                 global_step_transform=global_step_from_engine(trainer.engine))
+    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
+
+    @trainer.engine.on(Events.EPOCH_COMPLETED)
+    def log_unit_convergence(engine):
+        weights = model[1].weight.detach()
+        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
+        visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
+
+        fig = plt.figure()
+        plt.bar(range(sums.shape[0]), sums)
+        plt.xlabel("hidden units")
+        plt.ylabel("Sum of incoming weights")
+        fig.tight_layout()
+        visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
+
+    # Create a TensorBoard logger
+    tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
+    tb_logger.writer = visualizer.writer
+    tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model, layer_names=['linear1']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model, layer_names=['linear1']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'batch_norm', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=ActivationsScalarHandler(model, layer_names=['repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+
+    # We need to close the logger with we are done
+    tb_logger.close()
+
+    # @trainer.engine.on(Events.STARTED)
+    # @trainer.engine.on(Events.EPOCH_COMPLETED)
+    # def log_unit_stats(engine):
+    #     # TODO: WIP
+    #     # https://en.wikipedia.org/wiki/Digital_image_correlation_and_tracking
+    #     layer = model[1]
+    #     weights = layer.weight.detach()
+    #     weights = weights.view(weights.shape[0], 28, 28)
+    #     # kernels = weights.view(weights.shape[0], -1)
+    #     kernels = torch.squeeze(weights)
+    #     num_kernels = kernels.shape[0]
+    #     # kernel_size = kernels.shape[1]
+    #     corr = np.zeros((num_kernels, num_kernels))
+    #
+    #     # Zero-normalized cross-correlation (ZNCC)
+    #     for i in range(num_kernels):
+    #         for j in range(num_kernels):
+    #             # sim[i, j] = torch.sum(np.abs(kernels[i] - kernels[j])) / kernel_size
+    #             kernel1 = kernels[i].numpy()
+    #             kernel2 = kernels[j].numpy()
+    #             kernel1 = (kernel1 - np.mean(kernel1)) / np.std(kernel1)
+    #             kernel2 = (kernel2 - np.mean(kernel2)) / np.std(kernel2)
+    #             corr_mat = signal.correlate2d(kernel1, kernel2)
+    #             corr[i, j] = np.amax(corr_mat) / 784
+    #
+    #     fig = plt.figure()
+    #     mat = plt.imshow(corr, cmap='Reds', vmin=0)
+    #     plt.colorbar(mat)
+    #     fig.tight_layout()
+    #     image = utils.plot_to_img(fig)
+    #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
+
+
+def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'heb-{}'.format(identifier)
+    run = 'heb-{}-{}'.format(dataset_name, identifier)
     if run_postfix:
         run += '-' + run_postfix
     logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
-    model = models.dense_net1
+    model = models.create_fc1_model([28 ** 2, 900], batch_norm=True)
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
-        freeze_layers = ['1']
+        freeze_layers = ['linear1']
     else:
         freeze_layers = None
 
@@ -48,23 +119,8 @@ def main(args: Namespace, params: dict, run_postfix=""):
     logging.info("Device set to '{}'.".format(device))
     model.to(device)
 
-    # Loading the dataset and creating the data loaders and transforms
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-    # dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-    # dataset = Subset(dataset, [i for i in range(10000)])
-    train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-    train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
-
-    # Analyze dataset
-    data_batch = next(iter(train_loader))[0]
-    logging.debug("Data batch min: {:.4f}, max: {:.4f}.".format(torch.min(data_batch),
-                                                                torch.max(data_batch)))
-    logging.debug("Data batch mean: {1:.4f}, std: {0:.4f}.".format(*torch.std_mean(data_batch)))
+    # Data loaders
+    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
@@ -132,68 +188,11 @@ def main(args: Namespace, params: dict, run_postfix=""):
     if args.gpu_metrics and device == 'cuda':
         GpuInfo().attach(trainer.engine, name='gpu')
 
-    # Trainer progress bar persistence
-    if args.no_persist_pb:
-        trainer.pbar.persist = False
-
-    # Adding handlers for learning rate scheduling, model checkpoints and visualizing
-    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
-
-    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
-                                 global_step_transform=global_step_from_engine(trainer.engine))
-    trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
-
-    @trainer.engine.on(Events.EPOCH_STARTED)
-    def log_learning_rate(engine):
-        visualizer.writer.add_scalar('learning_rate', lr_scheduler.get_param(), engine.state.epoch - 1)
-
-    @trainer.engine.on(Events.EPOCH_COMPLETED)
-    def log_unit_convergence(engine):
-        weights = model[1].weight.detach()
-        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
-        visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
-
-        fig = plt.figure()
-        plt.bar(range(sums.shape[0]), sums)
-        plt.xlabel("{:.2f}% of hidden units 'converged'".format(engine.state.metrics['unit_conv'] * 100))
-        plt.ylabel("Sum of incoming weights")
-        fig.tight_layout()
-        visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
-
-    # @trainer.engine.on(Events.STARTED)
-    # @trainer.engine.on(Events.EPOCH_COMPLETED)
-    # def log_unit_stats(engine):
-    #     # TODO: WIP
-    #     # https://en.wikipedia.org/wiki/Digital_image_correlation_and_tracking
-    #     layer = model[1]
-    #     weights = layer.weight.detach()
-    #     weights = weights.view(weights.shape[0], 28, 28)
-    #     # kernels = weights.view(weights.shape[0], -1)
-    #     kernels = torch.squeeze(weights)
-    #     num_kernels = kernels.shape[0]
-    #     # kernel_size = kernels.shape[1]
-    #     corr = np.zeros((num_kernels, num_kernels))
-    #
-    #     # Zero-normalized cross-correlation (ZNCC)
-    #     for i in range(num_kernels):
-    #         for j in range(num_kernels):
-    #             # sim[i, j] = torch.sum(np.abs(kernels[i] - kernels[j])) / kernel_size
-    #             kernel1 = kernels[i].numpy()
-    #             kernel2 = kernels[j].numpy()
-    #             kernel1 = (kernel1 - np.mean(kernel1)) / np.std(kernel1)
-    #             kernel2 = (kernel2 - np.mean(kernel2)) / np.std(kernel2)
-    #             corr_mat = signal.correlate2d(kernel1, kernel2)
-    #             corr[i, j] = np.amax(corr_mat) / 784
-    #
-    #     fig = plt.figure()
-    #     mat = plt.imshow(corr, cmap='Reds', vmin=0)
-    #     plt.colorbar(mat)
-    #     fig.tight_layout()
-    #     image = utils.plot_to_img(fig)
-    #     visualizer.writer.add_image('kernel_correlation', image, engine.state.epoch)
+    # Handlers
+    attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=1000)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
 
     # # Save the final parameters with its corresponding metrics
     # visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
@@ -216,8 +215,6 @@ if __name__ == '__main__':
                         help="'cuda' (GPU) or 'cpu'")
     parser.add_argument('--gpu_metrics', action='store_true', default=False,
                         help='enable gpu metrics in the trainer progress bar')
-    parser.add_argument('--no_persist_pb', action='store_true', default=False,
-                        help="don't persist the trainer progress bar")
     args_ = parser.parse_args()
 
     with open(os.path.join(PATH, args_.json)) as f:
@@ -230,13 +227,15 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    # param_name = "norm"
-    # param_range = [9, 10, 11, 12]
+    dataset_name_ = 'mnist-fashion'
+
+    # param_name = "delta"
+    # param_range = [0.6, 0.7, 0.8]
     # for param in param_range:
     #     params_[param_name] = param
     #
     #     print("Investigating {}={}...".format(param_name, param))
-    #     metrics = main(args_, params_, run_postfix="p{}".format(param))
+    #     metrics = main(args_, params_, run_postfix="d{}".format(param))
     #     print(metrics)
 
-    main(args_, params_)
+    main(args_, params_, dataset_name=dataset_name_)
