@@ -27,7 +27,7 @@ def main(params):
         logging.info('Training on all train data!')
 
     # Loading the model and possibly initial weights
-    model = models.create_model(2000, n=params['n'])
+    model = models.dense_net1_mnist
     weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
     model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['1'], freeze=True)
 
@@ -101,23 +101,23 @@ if __name__ == '__main__':
     logging.getLogger("pytorch_hebbian").setLevel(logging.INFO)
 
     params_ = {
-        'train_batch_size': 100,
-        'val_batch_size': 100,
+        'train_batch_size': 256,
+        'val_batch_size': 256,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-5,
+        'lr': 1e-4,
         "train_all": False,
     }
 
-    results = []
-    param_range = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
-    for n in param_range:
-        print("Currently evaluating n={}.".format(n))
-        params_['n'] = n
-        result = main(params_)
-        results.append(result)
-        print("Result={}.".format(result))
+    # results = []
+    # param_range = [1]  # , 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
+    # for n in param_range:
+    #     print("Currently evaluating n={}.".format(n))
+    #     params_['n'] = n
+    #     result = main(params_)
+    #     results.append(result)
+    #     print("Result={}.".format(result))
+    #
+    # print(results)
 
-    print(results)
-
-    # main(params_)
+    main(params_)
