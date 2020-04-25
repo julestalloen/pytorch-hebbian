@@ -63,7 +63,15 @@ def prepare_batch(batch, device=None, non_blocking=False):
 
 
 def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = None, freeze=False):
-    """Load model weights from a stored state dict. Optionally only load weights for the specified layer."""
+    """Load model weights from a stored state dict. Optionally only load weights for the specified layer.
+
+    Args:
+        model: The model acquiring the weights.
+        state_dict_path: The path of the source state dict
+        layer_names: The names of the layer to load. Each name can also be a tuple specifying a source, destination
+            weight name mapping.
+        freeze: Freeze the loaded weights.
+    """
     if torch.cuda.is_available():
         device = 'cuda'
     else:
@@ -72,13 +80,19 @@ def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = No
     state_dict = torch.load(state_dict_path, map_location=torch.device(device))
 
     if layer_names is not None:
-        state_dict = extract_layers_from_state_dict(state_dict, layers=layer_names)
+        state_dict = extract_layers_from_state_dict(state_dict, layer_names=layer_names)
 
     model.load_state_dict(state_dict, strict=False if layer_names is not None else True)
     logger.info("Loaded initial model weights for layer(s) {} from '{}'.".format(layer_names, state_dict_path))
 
     if freeze:
-        for layer in [dict(model.named_children())[k] for k in layer_names]:
+        layers = []
+        for layer_name in layer_names:
+            if type(layer_name) == tuple:
+                layers.append(dict(model.named_children())[layer_name[1]])
+            else:
+                layers.append(dict(model.named_children())[layer_name])
+        for layer in layers:
             for param in layer.parameters():
                 param.requires_grad = False
         logger.info("Freezed layer(s) {}.".format(layer_names))
@@ -86,10 +100,20 @@ def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = No
     return model
 
 
-def extract_layers_from_state_dict(state_dict: dict, layers: List[str]):
+def extract_layers_from_state_dict(state_dict: dict, layer_names: List[str]):
     """Extract layers from a state dict."""
-    layer_weights = ['{}.weight'.format(layer) for layer in layers]
-    new_state_dict = {layer_weight: state_dict[layer_weight] for layer_weight in layer_weights}
+    new_state_dict = {}
+    for layer_name in layer_names:
+        if type(layer_name) == tuple:
+            old_layer_name = layer_name[0]
+            new_layer_name = layer_name[1]
+        else:
+            old_layer_name = new_layer_name = layer_name
+
+        old_layer_name = "{}.weight".format(old_layer_name)
+        new_layer_name = "{}.weight".format(new_layer_name)
+        new_state_dict[new_layer_name] = state_dict[old_layer_name]
+
     return new_state_dict
 
 

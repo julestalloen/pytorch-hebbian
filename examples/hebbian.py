@@ -104,7 +104,6 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     run = 'heb-{}-{}'.format(dataset_name, identifier)
     if run_postfix:
         run += '-' + run_postfix
-    logging.info("Starting run '{}'.".format(run))
 
     # Loading the model and possibly initial weights
     model = models.create_fc1_model([28 ** 2, 900], batch_norm=True)
@@ -170,8 +169,6 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_es_handler.logger.setLevel(logging.INFO)
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
-        # Trainer progress bar persistence
-        # if args.no_persist_pb:
         h_trainer.pbar.persist = False
 
         return h_trainer, h_evaluator

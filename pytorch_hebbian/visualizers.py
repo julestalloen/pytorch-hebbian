@@ -85,7 +85,7 @@ class TensorBoardVisualizer(Visualizer):
                 fig.tight_layout()
                 grid = utils.plot_to_img(fig)
 
-                self.writer.add_image(name + '.weight', grid, step)
+                self.writer.add_image(name + '/weight', grid, step)
 
     def visualize_stats(self, model, data_loader, params):
         """Visualize the model, some input samples and the hyperparameters"""
