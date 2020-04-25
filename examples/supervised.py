@@ -10,7 +10,7 @@ from ignite.handlers import EarlyStopping, ModelCheckpoint
 
 import data
 import models
-from pytorch_hebbian import config
+from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.trainers import SupervisedTrainer
@@ -19,18 +19,21 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def main(params, dataset_name):
+def main(params, dataset_name, transfer_learning=False):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
     run = 'sup-{}-{}'.format(dataset_name, identifier)
+    if transfer_learning:
+        run += "-tl"
 
     if params['train_all']:
         logging.info('Training on all train data!')
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model([28 ** 2, 2000], batch_norm=True)
-    # weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
-    # model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=[('1', 'linear1')], freeze=True)
+    model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=False)
+    if transfer_learning:
+        weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
+        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=[('1', 'linear1')], freeze=True)
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
@@ -123,7 +126,6 @@ if __name__ == '__main__':
         'lr': 1e-3,
         "train_all": False,
     }
-    dataset_name_ = 'mnist-fashion'
 
     # results = []
     # param_range = [1]  # , 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
@@ -136,4 +138,4 @@ if __name__ == '__main__':
     #
     # print(results)
 
-    main(params_, dataset_name_)
+    main(params_, dataset_name='mnist-fashion', transfer_learning=False)

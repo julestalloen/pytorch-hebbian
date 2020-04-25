@@ -103,6 +103,7 @@ class NumActivationsScalarHandler(BaseWeightsScalarHandler):
             self.hooks[name] = p.register_forward_hook(partial(self._hook_fn, layer_name=name))
 
     def _hook_fn(self, _, __, output, layer_name):
+        # TODO: probably better to maintain a running average instead of only storing the last batch
         self.activations[layer_name] = output
 
     def __call__(self, engine, logger, event_name):
