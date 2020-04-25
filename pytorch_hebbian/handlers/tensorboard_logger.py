@@ -7,6 +7,7 @@ from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger
 __all__ = [
     'WeightsScalarHandler',
     'WeightsHistHandler',
+    'NumActivationsScalarHandler',
     'ActivationsScalarHandler',
     'ActivationsHistHandler',
 ]
@@ -76,6 +77,50 @@ class WeightsHistHandler(BaseWeightsHistHandler):
             )
 
 
+class NumActivationsScalarHandler(BaseWeightsScalarHandler):
+    """Helper handler to log model's unit activation counts.
+    Handler iterates over named parameters of the model, applies reduction function to each parameter
+    produce a scalar and then logs the scalar.
+
+    Args:
+        model (torch.nn.Module): model to log weights
+        reduction (callable): function to reduce parameters into scalar
+        tag (str, optional): common title for all produced plots. For example, 'generator'
+    """
+
+    def __init__(self, model, reduction=torch.mean, layer_names=None, tag=None):
+        super().__init__(model, reduction, tag=tag)
+        self.layer_names = layer_names
+        self.activations = {}
+
+        # Register hooks
+        self.hooks = {}
+        for name, p in self.model.named_children():
+            if self.layer_names is not None:
+                if name not in self.layer_names:
+                    continue
+
+            self.hooks[name] = p.register_forward_hook(partial(self._hook_fn, layer_name=name))
+
+    def _hook_fn(self, _, __, output, layer_name):
+        self.activations[layer_name] = output
+
+    def __call__(self, engine, logger, event_name):
+
+        if not isinstance(logger, TensorboardLogger):
+            raise RuntimeError("Handler 'NumActivationsScalarHandler' works only with TensorboardLogger")
+
+        global_step = engine.state.get_event_attrib_value(event_name)
+        tag_prefix = "{}/".format(self.tag) if self.tag else ""
+        for layer_name, output in self.activations.items():
+            num_activated = (output > 0).sum(1).float()
+            logger.writer.add_scalar(
+                "{}num_activations_{}/{}".format(tag_prefix, self.reduction.__name__, layer_name),
+                self.reduction(num_activated.detach()),
+                global_step
+            )
+
+
 class ActivationsScalarHandler(BaseWeightsScalarHandler):
     """Helper handler to log model's unit activation counts.
     Handler iterates over named parameters of the model, applies reduction function to each parameter
@@ -112,10 +157,10 @@ class ActivationsScalarHandler(BaseWeightsScalarHandler):
         global_step = engine.state.get_event_attrib_value(event_name)
         tag_prefix = "{}/".format(self.tag) if self.tag else ""
         for layer_name, output in self.activations.items():
-            num_activated = (output > 0).sum(1).float()
+            activations = output.float()
             logger.writer.add_scalar(
-                "{}num_activations_{}/{}".format(tag_prefix, self.reduction.__name__, layer_name),
-                self.reduction(num_activated.detach()),
+                "{}activations_{}/{}".format(tag_prefix, self.reduction.__name__, layer_name),
+                self.reduction(activations.detach()),
                 global_step
             )
 
