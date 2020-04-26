@@ -51,6 +51,9 @@ def create_fc1_model(hu: List, n: int = 1, batch_norm=False):
         modules.append(('batch_norm', nn.BatchNorm1d(num_features=hu[1])))
 
     modules.append(('repu', RePU(n)))
-    modules.append(('linear2', nn.Linear(hu[1], 10)))
+
+    linear2 = nn.Linear(hu[1], 10)
+    # nn.init.xavier_uniform_(linear2.weight.data, gain=nn.init.calculate_gain('relu'))
+    modules.append(('linear2', linear2))
 
     return nn.Sequential(OrderedDict(modules))

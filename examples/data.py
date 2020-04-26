@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import torch
 from torch.utils.data import DataLoader, Subset
@@ -23,7 +24,7 @@ def get_data(params, dataset_name, subset=None):
         dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
 
     if subset is not None and subset > 0:
-        dataset = Subset(dataset, [i for i in range(10000)])
+        dataset = Subset(dataset, random.sample(range(len(dataset)), subset))
 
     if 'train_all' in params and params['train_all']:
         train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True)

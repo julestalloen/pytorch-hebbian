@@ -177,7 +177,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
                                      min_delta=0.0001,
                                      score_function=lambda engine: engine.state.metrics['accuracy'],
                                      trainer=h_trainer.engine, cumulative_delta=True)
-        h_es_handler.logger.setLevel(logging.INFO)
+        h_es_handler.logger.setLevel(logging.DEBUG)
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
         h_trainer.pbar.persist = False

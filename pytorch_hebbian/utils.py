@@ -95,7 +95,7 @@ def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = No
         for layer in layers:
             for param in layer.parameters():
                 param.requires_grad = False
-        logger.info("Freezed layer(s) {}.".format(layer_names))
+        logger.info("Freezed layer(s) {}.".format([ln[0] if type(ln) == tuple else ln for ln in layer_names]))
 
     return model
 
