@@ -83,6 +83,10 @@ class TensorBoardVisualizer(Visualizer):
                     plt.imshow(grid_np)
                 plt.axis('off')
                 fig.tight_layout()
+
+                # TODO: temp
+                plt.savefig(os.path.join(config.OUTPUT_DIR, "temp-weights.png"))
+
                 grid = utils.plot_to_img(fig)
 
                 self.writer.add_image(name + '/weight', grid, step)

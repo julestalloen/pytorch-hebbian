@@ -52,14 +52,25 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer,
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
     tb_logger.writer = visualizer.writer
     tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
-    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model, layer_names=['linear1']),
-                     event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model, layer_names=['linear1']),
+    tb_logger.attach(trainer.engine,
+                     log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
                      event_name=Events.EPOCH_COMPLETED)
     tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'batch_norm', 'repu']),
+                     log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
                      event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine, log_handler=ActivationsScalarHandler(model, layer_names=['repu']),
+    tb_logger.attach(trainer.engine,
+                     log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
+                                                          layer_names=['batch_norm', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsScalarHandler(model, reduction=torch.std,
+                                                          layer_names=['batch_norm', 'repu']),
                      event_name=Events.ITERATION_COMPLETED)
 
     # We need to close the logger with we are done
