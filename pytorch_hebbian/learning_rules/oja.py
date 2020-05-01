@@ -11,9 +11,9 @@ class OjasRule(LearningRule):
 
     def update(self, inputs, w):
         # TODO: needs re-implementation
-        d_ws = torch.zeros(inputs.size(0))
+        d_ws = torch.zeros(inputs.size(0), *w.shape)
         for idx, x in enumerate(inputs):
-            y = torch.dot(w, x)
+            y = torch.mm(w, x.unsqueeze(1))
 
             d_w = torch.zeros(w.shape)
             for i in range(y.shape[0]):

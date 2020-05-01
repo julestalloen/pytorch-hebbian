@@ -23,6 +23,9 @@ class Local(Optimizer):
             p = group['params'][layer_index]
             p.data.add_(group['lr'] * d_p)
 
-        self._step_count += 1
+        try:
+            self._step_count += 1
+        except AttributeError:
+            pass
 
         return loss
