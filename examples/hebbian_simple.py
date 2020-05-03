@@ -1,15 +1,11 @@
-import logging
-import os
-
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 
 import models
 from pytorch_hebbian import config
-from pytorch_hebbian.learning_rules import OjasRule
+from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
 def main():
@@ -21,22 +17,16 @@ def main():
         transforms.ToTensor(),
     ])
     dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-    train_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
 
     # Creating the learning rule, optimizer and trainer
-    learning_rule = OjasRule()
+    learning_rule = KrotovsRule()
     optimizer = Local(named_params=model.named_parameters(), lr=0.01)
-    visualizer = TensorBoardVisualizer(run='oja-test',
-                                       log_dir=os.path.join(config.OUTPUT_DIR, 'tensorboard', 'runs.temp'))
-    trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, visualizer=visualizer)
+    trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, epochs=1, vis_weights_every=1)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format=config.LOGGING_FORMAT)
-    logging.getLogger("ignite").setLevel(logging.WARN)
-    logging.getLogger("pytorch_hebbian").setLevel(logging.INFO)
-
     main()

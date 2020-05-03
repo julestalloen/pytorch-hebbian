@@ -27,7 +27,8 @@ def hook_fn(_, __, output):
 def plot_activations(weights, activations):
     global input_shape
     weights = weights.view(-1, *input_shape)
-    weights = weights[activations.bool(), :]
+    weights = torch.gather(weights, 0, activations)
+    # weights = weights[activations.bool(), :]
     print(weights.shape)
     num_weights = weights.shape[0]
     nrow = math.ceil(math.sqrt(num_weights))
@@ -54,7 +55,11 @@ def visualize_activations(inputs):
     global layer_outputs
     for i in range(layer_outputs.shape[0]):
         inp = inputs[i, :].numpy()
-        activations = (layer_outputs[i, :] > 0)
+        # TODO: WIP
+        sort, indices = torch.sort(layer_outputs[i, :], 0)
+        first_pos_index = (sort <= 0).sum(dim=0)
+        activations = indices[first_pos_index:]
+        # activations = (layer_outputs[i, :] > 0)
         nc = np.amax(np.absolute(inp))
         plt.imshow(np.transpose(inp, (1, 2, 0))[:, :, 0], cmap='bwr', vmin=-nc, vmax=nc)
         plt.show()
@@ -64,8 +69,8 @@ def visualize_activations(inputs):
 def main():
     global layer
     model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=True)
-    weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
-    model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=[('1', 'linear1')], freeze=True)
+    weights_path = "../../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
+    model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1'], freeze=True)
 
     hooks = {}
     for name, p in model.named_children():
