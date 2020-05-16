@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pytorch-hebbian",
-    version="0.0.1",
+    version="0.1.1",
     author="Jules Talloen",
     author_email="jules@talloen.eu",
     description="Lightweight framework for Hebbian learning based on PyTorch Ignite",
@@ -20,8 +20,8 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=[
-        'torch==1.4.0',
-        'torchvision==0.5.0',
+        'torch==1.5.0',
+        'torchvision==0.6.0',
         'tensorboard==2.2.0',
         'pytorch-ignite',
         'matplotlib',
