@@ -117,7 +117,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         run += '-' + run_postfix
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model([28 ** 2, 900], batch_norm=False)
+    model = models.create_fc1_model([28 ** 2, 2000], batch_norm=False)
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
