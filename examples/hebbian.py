@@ -117,7 +117,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         run += '-' + run_postfix
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model([28 ** 2, 900], batch_norm=True)
+    model = models.create_fc1_model([28 ** 2, 900], batch_norm=False)
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
@@ -126,11 +126,11 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Device selection
     device = utils.get_device(args.device)
-    logging.info("Device set to '{}'.".format(device))
+    print("Device set to '{}'.".format(device))
     model.to(device)
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
+    train_loader, val_loader = data.get_data(params, dataset_name)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
@@ -138,15 +138,8 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
-    # learning_rule = {
-    #     '0': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm']),
-    #     '3': KrotovsRule(delta=0.2, k=params['k'], norm=params['norm']),
-    # }
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
-    # TODO: Typing issue should be fixed in future pytorch update
-    #   https://github.com/pytorch/pytorch/issues/32645
-    # noinspection PyTypeChecker
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     lr_scheduler = LRScheduler(lr_scheduler)
 
@@ -235,7 +228,7 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    dataset_name_ = 'mnist-fashion'
+    dataset_name_ = 'mnist'
 
     # param_name = "delta"
     # param_range = [0.6, 0.7, 0.8]
