@@ -24,17 +24,22 @@ class Trainer(ABC):
     """
 
     def __init__(self, engine, model: torch.nn.Module, evaluator=None, train_evaluator=None,
-                 evaluator_args: Callable[[], dict] = None, visualizer: Visualizer = None):
+                 evaluator_args: Callable[[], dict] = None, visualizer: Visualizer = None,
+                 device: Optional[Union[str, torch.device]] = None):
         self.engine = engine
         self.model = model
         self.evaluator = evaluator
         self.train_evaluator = train_evaluator
         self.visualizer = visualizer
+        self.device = utils.get_device(device)
         self.train_loader = None
         self.val_loader = None
         self.eval_every = None
         self.vis_weights_every = None
         self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
+
+        # Move the model to the appropriate device
+        self.model.to(device)
 
         if evaluator_args is None:
             self.evaluator_args = lambda: {'val_loader': self.val_loader}
@@ -87,7 +92,8 @@ class Trainer(ABC):
                     if self.visualizer is not None:
                         self.visualizer.visualize_metrics(self.evaluator.engine.state.metrics, engine.state.epoch)
 
-    def run(self, train_loader: DataLoader, val_loader: DataLoader, epochs: int, eval_every=1, vis_weights_every=-1):
+    def run(self, train_loader: DataLoader, val_loader: DataLoader = None, epochs: int = 10, eval_every=1,
+            vis_weights_every=-1):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.eval_every = eval_every
@@ -127,11 +133,12 @@ class SupervisedTrainer(Trainer):
 
     def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, train_evaluator=None, evaluator=None,
                  visualizer: Visualizer = None, device: Optional[Union[str, torch.device]] = None):
-        engine = create_supervised_trainer(model, optimizer, criterion, device=utils.get_device(device))
+        device = utils.get_device(device)
+        engine = create_supervised_trainer(model, optimizer, criterion, device=device)
         RunningAverage(output_transform=lambda x: x).attach(engine, 'loss')
 
         super().__init__(engine=engine, model=model, evaluator=evaluator, train_evaluator=train_evaluator,
-                         visualizer=visualizer)
+                         visualizer=visualizer, device=device)
 
 
 class HebbianTrainer(Trainer):
@@ -161,7 +168,8 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
                  freeze_layers: List[str] = None, visualizer: Visualizer = None,
                  device: Optional[Union[str, torch.device]] = None):
-        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=utils.get_device(device))
+        device = utils.get_device(device)
+        engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
         if self.freeze_layers is None:
@@ -182,7 +190,7 @@ class HebbianTrainer(Trainer):
         else:
             self.learning_rule.init_layers(self.layers)
 
-        super().__init__(engine=engine, model=model, evaluator=evaluator, visualizer=visualizer,
+        super().__init__(engine=engine, model=model, evaluator=evaluator, visualizer=visualizer, device=device,
                          evaluator_args=lambda: {
                              'train_loader': self.train_loader,
                              'val_loader': self.val_loader,
