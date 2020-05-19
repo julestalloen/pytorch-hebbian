@@ -32,8 +32,8 @@ def main(params, dataset_name, transfer_learning=False):
     # Loading the model and possibly initial weights
     model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=False)
     if transfer_learning:
-        weights_path = "../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
-        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=[('1', 'linear1')], freeze=True)
+        weights_path = "../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
+        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1'], freeze=True)
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
@@ -79,26 +79,22 @@ def main(params, dataset_name, transfer_learning=False):
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
     tb_logger.writer = visualizer.writer
     tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
-                     event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
-                     event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
-                                                          layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsScalarHandler(model, reduction=torch.std,
-                                                          layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model), event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model), event_name=Events.EPOCH_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=NumActivationsScalarHandler(model, layer_names=['linear1', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
+    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
+    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
 
     # We need to close the logger with we are done
     tb_logger.close()
@@ -138,4 +134,4 @@ if __name__ == '__main__':
     #
     # print(results)
 
-    main(params_, dataset_name='mnist-fashion', transfer_learning=False)
+    main(params_, dataset_name='mnist-fashion', transfer_learning=True)
