@@ -92,6 +92,7 @@ def load_weights(model: torch.nn.Module, state_dict_path, layer_names: List = No
                 layers.append(dict(model.named_children())[layer_name[1]])
             else:
                 layers.append(dict(model.named_children())[layer_name])
+
         for layer in layers:
             for param in layer.parameters():
                 param.requires_grad = False
