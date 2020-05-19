@@ -10,6 +10,6 @@ class SPELoss(Module):
 
     def forward(self, output, target):
         output = torch.tanh(self.beta * output)
-        target = torch.nn.functional.one_hot(target, num_classes=output.shape[1])
+        target = torch.nn.functional.one_hot(target, num_classes=output.shape[1]) * 2 - 1
         loss = torch.sum(torch.abs(output - target) ** self.m)
         return loss

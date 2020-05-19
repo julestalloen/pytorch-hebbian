@@ -41,7 +41,7 @@ conv_net2 = nn.Sequential(
 )
 
 
-def create_fc1_model(hu: List, n: int = 1, batch_norm=False):
+def create_fc1_model(hu: List, n: float = 1.0, batch_norm=False):
     modules = [
         ('flatten', Flatten()),
         ('linear1', nn.Linear(hu[0], hu[1], bias=False))

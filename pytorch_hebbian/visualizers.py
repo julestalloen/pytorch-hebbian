@@ -34,7 +34,7 @@ class TensorBoardVisualizer(Visualizer):
         self.writer = SummaryWriter(os.path.join(log_dir, run))
         self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
-        self.logger.info("Visualizer initiated for run '{}'.".format(run))
+        self.logger.info("Visualizer initialized for run '{}'.".format(run))
 
     def visualize_metrics(self, metrics, epoch: int, train=False):
         if train:
