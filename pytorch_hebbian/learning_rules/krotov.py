@@ -61,6 +61,7 @@ class KrotovsRule(LearningRule):
 
         return d_w
 
+    # TODO: temp
     def update_argsort(self, inputs: torch.Tensor, weights: torch.Tensor):
         batch_size = inputs.shape[0]
         num_hidden_units = weights.shape[0]

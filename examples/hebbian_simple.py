@@ -10,13 +10,13 @@ from pytorch_hebbian.trainers import HebbianTrainer
 
 def main():
     # Creating the model
-    model = models.create_fc1_model([32 ** 2 * 3, 2000])
+    model = models.create_fc1_model([28 ** 2, 2000])
 
     # Creating the transforms, dataset and data loaders
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
     train_loader = DataLoader(dataset, batch_size=1024, shuffle=True)
 
     # Creating the learning rule, optimizer and trainer

@@ -6,6 +6,7 @@ from argparse import ArgumentParser, Namespace
 
 import torch
 from ignite.contrib.handlers import LRScheduler
+from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.contrib.metrics import GpuInfo
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
@@ -15,6 +16,7 @@ import data
 import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
+from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
@@ -45,32 +47,32 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer,
         visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
 
     # Create a TensorBoard logger
-    # tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
-    # tb_logger.writer = visualizer.writer
-    # tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
-    #                  event_name=Events.EPOCH_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
-    #                  event_name=Events.EPOCH_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
-    #                                                       layer_names=['batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
-    #                                                       layer_names=['batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
+    tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
+    tb_logger.writer = visualizer.writer
+    tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
+                     event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
+                                                          layer_names=['batch_norm', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
+    tb_logger.attach(trainer.engine,
+                     log_handler=ActivationsScalarHandler(model, reduction=torch.std,
+                                                          layer_names=['batch_norm', 'repu']),
+                     event_name=Events.ITERATION_COMPLETED)
 
     # We need to close the logger with we are done
-    # tb_logger.close()
+    tb_logger.close()
 
 
 def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
@@ -159,12 +161,6 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
 
-    # # Save the final parameters with its corresponding metrics
-    # visualizer.writer.add_hparams(params, evaluator.engine.state.metrics)
-    #
-    # return evaluator.engine.state.metrics
-    return 0
-
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -192,15 +188,4 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    dataset_name_ = 'mnist'
-
-    # param_name = "delta"
-    # param_range = [0.6, 0.7, 0.8]
-    # for param in param_range:
-    #     params_[param_name] = param
-    #
-    #     print("Investigating {}={}...".format(param_name, param))
-    #     metrics = main(args_, params_, run_postfix="d{}".format(param))
-    #     print(metrics)
-
-    main(args_, params_, dataset_name=dataset_name_)
+    main(args_, params_, dataset_name='mnist')
