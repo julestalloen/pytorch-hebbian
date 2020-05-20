@@ -19,6 +19,46 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
+def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, _):
+    # Learning rate scheduling
+    evaluator.engine.add_event_handler(Events.COMPLETED,
+                                       lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
+
+    # Early stopping
+    es_handler = EarlyStopping(patience=30, score_function=lambda engine: engine.state.metrics['accuracy'],
+                               trainer=trainer.engine, cumulative_delta=True, min_delta=0.0001)
+    evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
+    es_handler.logger.setLevel(logging.DEBUG)
+
+    # Model checkpoints
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+                                 score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
+                                 global_step_transform=global_step_from_engine(trainer.engine))
+    evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
+
+    # TensorBoard logger
+    tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
+    tb_logger.writer = visualizer.writer
+    tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model), event_name=Events.EPOCH_COMPLETED)
+    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model), event_name=Events.EPOCH_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=NumActivationsScalarHandler(model, layer_names=['linear1', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
+    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
+    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    tb_logger.close()
+
+
 def main(params, dataset_name, transfer_learning=False):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
@@ -59,54 +99,10 @@ def main(params, dataset_name, transfer_learning=False):
     else:
         eval_to_monitor = evaluator
 
-    # Learning rate scheduling
-    eval_to_monitor.engine.add_event_handler(Events.COMPLETED,
-                                             lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
-
-    # Early stopping
-    es_handler = EarlyStopping(patience=30, score_function=lambda engine: engine.state.metrics['accuracy'],
-                               trainer=trainer.engine, cumulative_delta=True, min_delta=0.0001)
-    eval_to_monitor.engine.add_event_handler(Events.COMPLETED, es_handler)
-    es_handler.logger.setLevel(logging.DEBUG)
-
-    # Model checkpoints
-    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
-                                 score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
-                                 global_step_transform=global_step_from_engine(trainer.engine))
-    eval_to_monitor.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
-
-    # TensorBoard logger
-    tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
-    tb_logger.writer = visualizer.writer
-    tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
-    tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model), event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model), event_name=Events.EPOCH_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsHistHandler(model, layer_names=['linear1', 'batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=NumActivationsScalarHandler(model, layer_names=['linear1', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
-    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.attach(trainer.engine,
-    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
-    #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
-    #                  event_name=Events.ITERATION_COMPLETED)
-
-    # We need to close the logger with we are done
-    tb_logger.close()
+    attach_handlers(run, model, optimizer, lr_scheduler, trainer, eval_to_monitor, visualizer, params)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
-
-    if not params['train_all']:
-        # Save the final parameters with its corresponding metrics
-        visualizer.writer.add_hparams(params, {'hparam/accuracy': es_handler.best_score})
-
-    return es_handler.best_score
 
 
 if __name__ == '__main__':
@@ -122,16 +118,5 @@ if __name__ == '__main__':
         'lr': 1e-3,
         "train_all": False,
     }
-
-    # results = []
-    # param_range = [1]  # , 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
-    # for n in param_range:
-    #     print("Currently evaluating n={}.".format(n))
-    #     params_['n'] = n
-    #     result = main(params_)
-    #     results.append(result)
-    #     print("Result={}.".format(result))
-    #
-    # print(results)
 
     main(params_, dataset_name='mnist-fashion', transfer_learning=True)
