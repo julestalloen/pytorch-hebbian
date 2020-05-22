@@ -27,9 +27,12 @@ PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer, params):
+    # Learning rate scheduling
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
 
-    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+    # Early stopping
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, run.replace('/', '-'), n_saved=1, create_dir=True,
+                                 require_empty=False,
                                  global_step_transform=global_step_from_engine(trainer.engine))
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
@@ -56,29 +59,27 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer,
     tb_logger.attach(trainer.engine,
                      log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
                      event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
-                                                          layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=ActivationsScalarHandler(model, reduction=torch.std,
-                                                          layer_names=['batch_norm', 'repu']),
-                     event_name=Events.ITERATION_COMPLETED)
-
-    # We need to close the logger with we are done
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=NumActivationsScalarHandler(model, layer_names=['repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.mean,
+    #                                                       layer_names=['batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
+    #                                                       layer_names=['batch_norm', 'repu']),
+    #                  event_name=Events.ITERATION_COMPLETED)
     tb_logger.close()
 
 
 def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'heb-{}-{}'.format(dataset_name, identifier)
+    run = 'heb/{}/{}'.format(dataset_name, identifier)
     if run_postfix:
         run += '-' + run_postfix
 
@@ -96,7 +97,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     model.to(device)
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name)
+    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
@@ -126,8 +127,9 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
                                              lambda engine: h_lr_scheduler.step(engine.state.metrics['accuracy']))
 
         # Model checkpoints
-        h_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
-                                    score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
+        h_handler = ModelCheckpoint(config.MODELS_DIR, run.replace('/', '-'), n_saved=1, create_dir=True,
+                                    require_empty=False, score_name='acc',
+                                    score_function=lambda engine: engine.state.metrics['accuracy'],
                                     global_step_transform=global_step_from_engine(trainer.engine))
         h_evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, h_handler, {'m': model})
 
@@ -188,4 +190,4 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    main(args_, params_, dataset_name='mnist')
+    main(args_, params_, dataset_name='mnist-fashion')

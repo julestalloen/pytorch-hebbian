@@ -19,19 +19,24 @@ from pytorch_hebbian.visualizers import TensorBoardVisualizer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, _):
+def attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, visualizer, params):
     # Learning rate scheduling
     evaluator.engine.add_event_handler(Events.COMPLETED,
                                        lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
 
     # Early stopping
-    es_handler = EarlyStopping(patience=30, score_function=lambda engine: engine.state.metrics['accuracy'],
+    es_handler = EarlyStopping(patience=15, score_function=lambda engine: engine.state.metrics['accuracy'],
                                trainer=trainer.engine, cumulative_delta=True, min_delta=0.0001)
-    evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
+    if 'train_all' in params and params['train_all']:
+        train_evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
+    else:
+        evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
+
     es_handler.logger.setLevel(logging.DEBUG)
 
     # Model checkpoints
-    mc_handler = ModelCheckpoint(config.MODELS_DIR, run, n_saved=1, create_dir=True, require_empty=False,
+    name = run.replace('/', '-')
+    mc_handler = ModelCheckpoint(config.MODELS_DIR, name, n_saved=1, create_dir=True, require_empty=False,
                                  score_name='acc', score_function=lambda engine: engine.state.metrics['accuracy'],
                                  global_step_transform=global_step_from_engine(trainer.engine))
     evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
@@ -62,21 +67,25 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, vis
 def main(params, dataset_name, transfer_learning=False):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'sup-{}-{}'.format(dataset_name, identifier)
+    run = 'sup/{}/{}'.format(dataset_name, identifier)
     if transfer_learning:
         run += "-tl"
-
-    if params['train_all']:
-        logging.info('Training on all train data!')
+    if 'train_all' in params and params['train_all']:
+        run += "-test"
 
     # Loading the model and possibly initial weights
     model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=False)
     if transfer_learning:
-        weights_path = "../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
+        weights_path = "../output/models/heb-mnist-fashion-20200522-174314_m_499.pth"
         model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1'], freeze=True)
 
+    # TODO: TEMP
+    # dict(model.named_children())['linear1'].weight.data.normal_(mean=0.0, std=1.0)
+    # for param in dict(model.named_children())['linear1'].parameters():
+    #     param.requires_grad = False
+
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
+    train_loader, val_loader = data.get_data(params, dataset_name)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run)
@@ -85,21 +94,13 @@ def main(params, dataset_name, transfer_learning=False):
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=10, factor=0.5)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', verbose=True, patience=5, factor=0.5)
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
-    if params['train_all']:
-        evaluator = None
-    else:
-        evaluator = SupervisedEvaluator(model=model, criterion=criterion)
+    evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, train_evaluator=train_evaluator,
                                 evaluator=evaluator, visualizer=visualizer)
 
-    if params['train_all']:
-        eval_to_monitor = train_evaluator
-    else:
-        eval_to_monitor = evaluator
-
-    attach_handlers(run, model, optimizer, lr_scheduler, trainer, eval_to_monitor, visualizer, params)
+    attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, visualizer, params)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
@@ -115,7 +116,7 @@ if __name__ == '__main__':
         'val_batch_size': 128,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-3,
+        'lr': 1e-4,
         "train_all": False,
     }
 

@@ -1,7 +1,8 @@
+from collections import defaultdict
 from functools import partial
 
 import torch
-from ignite.contrib.handlers.base_logger import BaseWeightsScalarHandler, BaseWeightsHistHandler
+from ignite.contrib.handlers.base_logger import BaseHandler, BaseWeightsScalarHandler, BaseWeightsHistHandler
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger
 
 __all__ = [
@@ -77,21 +78,22 @@ class WeightsHistHandler(BaseWeightsHistHandler):
             )
 
 
-class NumActivationsScalarHandler(BaseWeightsScalarHandler):
+class NumActivationsScalarHandler(BaseHandler):
     """Helper handler to log model's unit activation counts.
     Handler iterates over named parameters of the model, applies reduction function to each parameter
     produce a scalar and then logs the scalar.
 
     Args:
         model (torch.nn.Module): model to log weights
-        reduction (callable): function to reduce parameters into scalar
         tag (str, optional): common title for all produced plots. For example, 'generator'
     """
 
-    def __init__(self, model, reduction=torch.mean, layer_names=None, tag=None):
-        super().__init__(model, reduction, tag=tag)
+    def __init__(self, model, layer_names=None, tag=None):
+        self.model = model
+        self.tag = tag
         self.layer_names = layer_names
-        self.activations = {}
+        self._num_iterations = defaultdict(int)
+        self._num_activations_mean = defaultdict(int)
 
         # Register hooks
         self.hooks = {}
@@ -103,8 +105,14 @@ class NumActivationsScalarHandler(BaseWeightsScalarHandler):
             self.hooks[name] = p.register_forward_hook(partial(self._hook_fn, layer_name=name))
 
     def _hook_fn(self, _, __, output, layer_name):
-        # TODO: probably better to maintain a running average instead of only storing the last batch
-        self.activations[layer_name] = output
+        self._num_iterations[layer_name] += 1
+        self._num_activations_mean[layer_name] += (output.detach() > 0).sum(1).float().mean()
+        # TODO
+        # print('test', (output.detach() > 0).sum(1).float().mean())
+
+    def reset(self, layer_name):
+        self._num_iterations[layer_name] = 0
+        self._num_activations_mean[layer_name] = 0
 
     def __call__(self, engine, logger, event_name):
 
@@ -113,11 +121,15 @@ class NumActivationsScalarHandler(BaseWeightsScalarHandler):
 
         global_step = engine.state.get_event_attrib_value(event_name)
         tag_prefix = "{}/".format(self.tag) if self.tag else ""
-        for layer_name, output in self.activations.items():
-            num_activated = (output > 0).sum(1).float()
+        for layer_name in self.layer_names:
+            num_activations_mean = self._num_activations_mean[layer_name]
+            num_iterations = self._num_iterations[layer_name]
+            self.reset(layer_name)
+            # TODO
+            # print('test2', num_activations_mean / num_iterations)
             logger.writer.add_scalar(
-                "{}num_activations_{}/{}".format(tag_prefix, self.reduction.__name__, layer_name),
-                self.reduction(num_activated.detach()),
+                "{}num_activations_mean/{}".format(tag_prefix, layer_name),
+                num_activations_mean / num_iterations,
                 global_step
             )
 

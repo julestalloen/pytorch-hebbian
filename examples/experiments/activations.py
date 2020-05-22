@@ -47,6 +47,8 @@ def plot_weights(weights, activation_indices):
         plt.imshow(grid_np)
     plt.axis('off')
     fig.tight_layout()
+    fig_path = 'activations.png'
+    plt.savefig(fig_path, bbox_inches='tight', pad_inches=0.06)
     plt.show()
 
     return weights
@@ -58,6 +60,7 @@ def plot_overlay(activated_weights, inp, activations):
         overlay = np.multiply(inp, unit)
 
         images = [inp, unit, overlay]
+        titles = ["input", "unit weights", "multiplied"]
         ticks_min = np.amin(images)
         ticks_max = np.amax(images)
         nc = np.amax(np.absolute(images))
@@ -68,10 +71,13 @@ def plot_overlay(activated_weights, inp, activations):
         for j, ax in enumerate(axs):
             image = images[j]
             im = ax.imshow(np.transpose(image, (1, 2, 0))[:, :, 0], cmap='bwr', vmin=-nc, vmax=nc)
+            ax.title.set_text(titles[j])
 
-        fig.colorbar(im, ticks=[ticks_min, 0, ticks_max], ax=axs, shrink=0.7)
+        fig.colorbar(im, ticks=[ticks_min, (ticks_max - ticks_min) / 2, ticks_max], ax=axs, shrink=0.7)
         fig.suptitle('Activation = {}'.format(activations[i]))
         # fig.tight_layout()
+        fig_path = 'combined.png'
+        plt.savefig(fig_path, bbox_inches='tight', pad_inches=0.06)
         plt.show()
 
 
@@ -93,7 +99,9 @@ def visualize_activations(inputs):
 
         nc = np.amax(np.absolute(inp))
         im = plt.imshow(np.transpose(inp, (1, 2, 0))[:, :, 0], cmap='bwr', vmin=-nc, vmax=nc)
-        plt.colorbar(im, ticks=[np.amin(inp), 0, np.amax(inp)])
+        plt.colorbar(im, ticks=[np.amin(inp), (np.amax(inp) - np.amin(inp)) / 2, np.amax(inp)])
+        fig_path = 'input.png'
+        plt.savefig(fig_path, bbox_inches='tight', pad_inches=0.06)
         plt.show()
 
         activated_weights = plot_weights(layer.weight, activation_indices)
@@ -104,8 +112,11 @@ def main():
     with torch.no_grad():
         global layer
         model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=True)
-        weights_path = "../../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
-        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1', 'batch_norm'])
+        # weights_path = "../../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
+        # layer_names = ['linear1', 'batch_norm']
+        weights_path = "../../output/models/heb-20200417-134912_m_1000_acc=0.8381666666666666.pth"
+        layer_names = [('1', 'linear1')]
+        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=layer_names)
 
         for name, p in model.named_children():
             if name == "repu":
