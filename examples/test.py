@@ -16,8 +16,8 @@ PATH = os.path.dirname(os.path.abspath(__file__))
 
 def main(params):
     # Loading the model and possibly initial weights
-    model = models.dense_net1
-    weights_path = "../output/models/sup-20200411-185539_m_80_acc=0.9895666666666667.pth"
+    model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=True)
+    weights_path = "../output/models/heb-mnist-fashion-20200426-101420_m_500_acc=0.852.pth"
     state_dict_path = os.path.join(PATH, weights_path)
     model = load_weights(model, state_dict_path)
 
@@ -30,7 +30,7 @@ def main(params):
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform, train=False)
+    dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform, train=False)
     test_loader = DataLoader(dataset, batch_size=params['val_batch_size'], shuffle=False)
 
     criterion = torch.nn.CrossEntropyLoss()
@@ -49,11 +49,7 @@ if __name__ == '__main__':
     logging.getLogger("ignite").setLevel(logging.WARNING)
 
     params_ = {
-        'train_batch_size': 128,
-        'val_batch_size': 128,
-        'val_split': 0.2,
-        'epochs': 500,
-        'lr': 0.001
+        'val_batch_size': 128
     }
 
     main(params_)

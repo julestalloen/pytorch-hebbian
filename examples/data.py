@@ -18,17 +18,21 @@ def get_data(params, dataset_name, subset=None):
     ])
     if dataset_name == 'mnist':
         dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+        test_dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, train=False, transform=transform)
     elif dataset_name == 'mnist-fashion':
         dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
+        test_dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, train=False,
+                                                   transform=transform)
     else:
         dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
+        test_dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, train=False, transform=transform)
 
     if subset is not None and subset > 0:
         dataset = Subset(dataset, random.sample(range(len(dataset)), subset))
 
     if 'train_all' in params and params['train_all']:
         train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = None
+        val_loader = DataLoader(test_dataset, batch_size=params['val_batch_size'], shuffle=False)
     else:
         train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
         train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
