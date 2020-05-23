@@ -74,15 +74,10 @@ def main(params, dataset_name, transfer_learning=False):
         run += "-test"
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model([28 ** 2, 2000], n=1, batch_norm=False)
+    model = models.create_conv1_model(input_dim=28, input_channels=1, num_kernels=400, kernel_size=5, pool_size=2, n=1)
     if transfer_learning:
         weights_path = "../output/models/heb-mnist-fashion-20200522-174314_m_499.pth"
         model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1'], freeze=True)
-
-    # TODO: TEMP
-    # dict(model.named_children())['linear1'].weight.data.normal_(mean=0.0, std=1.0)
-    # for param in dict(model.named_children())['linear1'].parameters():
-    #     param.requires_grad = False
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name)
@@ -112,12 +107,13 @@ if __name__ == '__main__':
     logging.getLogger("pytorch_hebbian").setLevel(logging.INFO)
 
     params_ = {
-        'train_batch_size': 128,
-        'val_batch_size': 128,
+        'train_batch_size': 256,
+        'val_batch_size': 256,
         'val_split': 0.2,
         'epochs': 500,
-        'lr': 1e-4,
+        'lr': 1e-3,
+        'batch_norm': False,
         "train_all": False,
     }
 
-    main(params_, dataset_name='mnist-fashion', transfer_learning=True)
+    main(params_, dataset_name='mnist-fashion', transfer_learning=False)

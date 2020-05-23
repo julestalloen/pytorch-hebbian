@@ -36,16 +36,16 @@ def create_fc2_model():
     return dense_net
 
 
-def create_conv1_model(input_dim, input_channels=1, num_kernels=8, kernel_size=4, pool_size=2):
-    conv_net = nn.Sequential(
-        nn.Conv2d(input_channels, num_kernels, kernel_size, bias=False),
-        nn.ReLU(),
-        nn.MaxPool2d(pool_size),
-        Flatten(),
-        nn.Linear(num_kernels * int(((input_dim - (kernel_size - 1)) / 2)) ** 2, 10)
-    )
+def create_conv1_model(input_dim, input_channels=1, num_kernels=8, kernel_size=5, pool_size=2, n=1):
+    modules = [
+        ('conv1', nn.Conv2d(input_channels, num_kernels, kernel_size, bias=False)),
+        ('repu', RePU(n)),
+        ('pool1', nn.MaxPool2d(pool_size)),
+        ('flatten', Flatten()),
+        ('linear1', nn.Linear(num_kernels * int(((input_dim - (kernel_size - 1)) / 2)) ** 2, 10))
+    ]
 
-    return conv_net
+    return nn.Sequential(OrderedDict(modules))
 
 
 def create_conv2_model(input_dim, input_channels=1, num_kernels=None, kernel_size=4, pool_size=2):
