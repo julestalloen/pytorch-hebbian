@@ -91,14 +91,17 @@ class TensorBoardVisualizer(Visualizer):
 
                 self.writer.add_image(name + '/weight', grid, step)
 
-    def visualize_stats(self, model, data_loader, params):
+    def visualize_stats(self, model, data_loader, params, project=False):
         """Visualize the model, some input samples and the hyperparameters"""
         model = copy.deepcopy(model).cpu()
         images, labels = next(iter(data_loader))
         self.writer.add_graph(model, images)
         self.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
-        num_project = 100
-        self.project(images[:num_project], labels[:num_project])
+
+        if project:
+            num_project = 100
+            self.project(images[:num_project], labels[:num_project])
+
         self.writer.add_hparams(params, {})
 
     def project(self, images, labels):

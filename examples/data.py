@@ -11,6 +11,7 @@ from pytorch_hebbian import config, utils
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
+# TODO: only load test data when needed
 def get_data(params, dataset_name, subset=None):
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([

@@ -103,18 +103,8 @@ class Trainer(ABC):
         else:
             self.vis_weights_every = vis_weights_every
 
-        if self.val_loader is not None:
-            self.logger.info('Received {} training and {} validation samples.'.format(len(train_loader.dataset),
-                                                                                      len(val_loader.dataset)))
-        else:
-            self.logger.info('Received {} training samples.'.format(len(train_loader.dataset)))
-        if self.evaluator is not None:
-            info_str = 'Training {} epoch(s), evaluating every {} epoch(s).'.format(epochs, self.eval_every)
-        else:
-            info_str = 'Training {} epoch(s).'.format(epochs)
-        self.logger.info(info_str)
-        if self.visualizer is not None:
-            self.logger.info('Visualizing weights every {} iterations(s).'.format(self.vis_weights_every))
+        self.logger.info('Received {} training samples.'.format(len(train_loader.dataset)))
+        self.logger.info('Training {} epoch(s).'.format(epochs))
 
         self.engine.run(train_loader, max_epochs=epochs)
 
