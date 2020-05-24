@@ -48,19 +48,20 @@ def create_conv1_model(input_dim, input_channels=1, num_kernels=8, kernel_size=5
     return nn.Sequential(OrderedDict(modules))
 
 
-def create_conv2_model(input_dim, input_channels=1, num_kernels=None, kernel_size=4, pool_size=2):
+def create_conv2_model(input_dim, input_channels=1, num_kernels=None, kernel_size=4, pool_size=2, n=1):
     if num_kernels is None:
         num_kernels = [8, 16]
 
-    conv_net = nn.Sequential(
-        nn.Conv2d(input_channels, num_kernels[0], kernel_size, bias=False),
-        nn.ReLU(),
-        nn.MaxPool2d(pool_size),
-        nn.Conv2d(num_kernels[0], num_kernels[1], kernel_size, bias=False),
-        nn.ReLU(),
-        nn.MaxPool2d(pool_size),
-        Flatten(),
-        nn.Linear(num_kernels[1] * int(((input_dim - (kernel_size - 1)) / 2 - (kernel_size - 1)) / 2) ** 2, 10)
-    )
+    modules = [
+        ('conv1', nn.Conv2d(input_channels, num_kernels[0], kernel_size, bias=False)),
+        ('repu1', RePU(n)),
+        ('pool1', nn.MaxPool2d(pool_size)),
+        ('conv2', nn.Conv2d(num_kernels[0], num_kernels[1], kernel_size, bias=False)),
+        ('repu2', RePU(n)),
+        ('pool2', nn.MaxPool2d(pool_size)),
+        ('flatten', Flatten()),
+        ('linear1',
+         nn.Linear(num_kernels[1] * int(((input_dim - (kernel_size - 1)) / 2 - (kernel_size - 1)) / 2) ** 2, 10))
+    ]
 
-    return conv_net
+    return nn.Sequential(OrderedDict(modules))

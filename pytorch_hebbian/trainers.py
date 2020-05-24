@@ -209,7 +209,7 @@ class HebbianTrainer(Trainer):
             for lyr in layers[:layer_index]:
                 x = lyr(x)
 
-        # TODO: trigger forward hooks for remaining layers
+        # TODO: TEMP to trigger forward hooks for remaining layers
         model(inputs)
 
         # Get the layer weight and input image patches
