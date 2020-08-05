@@ -33,7 +33,7 @@ class HebbianEvaluator:
 
     def __init__(self, model: torch.nn.Module, score_name: str, score_function: Callable,
                  init_function: Callable[[torch.nn.Module], tuple] = None, epochs: int = 100,
-                 supervised_from: int = None, supervised_eval_every: int = 5):
+                 supervised_from: int = None, supervised_eval_every: int = 1):
         self.model = model
         self.score_name = score_name
         self.score_function = score_function

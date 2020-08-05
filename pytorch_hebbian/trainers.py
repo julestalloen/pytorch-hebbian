@@ -198,6 +198,7 @@ class HebbianTrainer(Trainer):
             model: The model to be trained.
             layer_index: The index of the layer currently being trained.
         """
+        # TODO: make more efficient with single pass and hooks?
         layers = list(model.children())
         layer = layers[layer_index]
 
