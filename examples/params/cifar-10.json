@@ -5,9 +5,9 @@
     "val_batch_size": 1000,
     "val_split": 0.2,
     "epochs": 1000,
-    "delta": 0.2,
+    "delta": 0.1,
     "k": 2,
-    "norm": 4,
+    "norm": 5,
     "lr": 0.02
   }
 }

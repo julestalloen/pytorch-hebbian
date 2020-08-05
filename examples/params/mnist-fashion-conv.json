@@ -4,10 +4,10 @@
     "train_batch_size": 2,
     "val_batch_size": 256,
     "val_split": 0.2,
-    "epochs": 50,
+    "epochs": 100,
     "delta": 0.4,
     "k": 2,
     "norm": 3,
-    "lr": 0.04
+    "lr": 0.01
   }
 }

@@ -36,14 +36,27 @@ def create_fc2_model():
     return dense_net
 
 
-def create_conv1_model(input_dim, input_channels=1, num_kernels=8, kernel_size=5, pool_size=2, n=1):
+def create_conv1_model(input_dim, input_channels=1, num_kernels=8, kernel_size=5, pool_size=2, n=1, batch_norm=False,
+                       dropout=None):
     modules = [
-        ('conv1', nn.Conv2d(input_channels, num_kernels, kernel_size, bias=False)),
+        ('conv1', nn.Conv2d(input_channels, num_kernels, kernel_size, bias=False))
+    ]
+
+    if batch_norm:
+        modules.append(('batch_norm', nn.BatchNorm2d(num_features=num_kernels)))
+
+    modules.extend([
         ('repu', RePU(n)),
         ('pool1', nn.MaxPool2d(pool_size)),
+    ])
+
+    if dropout is not None:
+        modules.append(('dropout1', nn.Dropout2d(dropout)))
+
+    modules.extend([
         ('flatten', Flatten()),
         ('linear1', nn.Linear(num_kernels * int(((input_dim - (kernel_size - 1)) / 2)) ** 2, 10))
-    ]
+    ])
 
     return nn.Sequential(OrderedDict(modules))
 
