@@ -20,7 +20,7 @@ class OutputHandler(BaseOutputHandler):
     """
 
     def __init__(self, tag, metric_names="all", output_transform=None, global_step_transform=None):
-        super(OutputHandler, self).__init__(tag, metric_names, output_transform, None, global_step_transform)
+        super(OutputHandler, self).__init__(tag, metric_names, output_transform, global_step_transform)
 
     def __call__(self, engine, logger, event_name):
 
@@ -65,3 +65,10 @@ class TqdmLogger(BaseLogger):
         if self.pbar:
             self.pbar.close()
         self.pbar = None
+
+    def _create_output_handler(self, *args, **kwargs):
+        return OutputHandler(*args, **kwargs)
+
+    def _create_opt_params_handler(self, *args, **kwargs):
+        """Intentionally empty"""
+        pass

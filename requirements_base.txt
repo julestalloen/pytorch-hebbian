@@ -1,5 +1,5 @@
-tensorboard==2.2.0
-pytorch-ignite
+tensorboard==2.3.0
+pytorch-ignite==0.4.*
 matplotlib
 numpy
 Pillow
