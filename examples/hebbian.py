@@ -10,15 +10,12 @@ from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, Optimi
 from ignite.contrib.metrics import GpuInfo
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
-from matplotlib import pyplot as plt
 
 import data
 import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
-from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.learning_rules import KrotovsRule
-from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 from pytorch_hebbian.visualizers import TensorBoardVisualizer
@@ -36,29 +33,29 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer,
                                  global_step_transform=global_step_from_engine(trainer.engine))
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
 
-    @trainer.engine.on(Events.EPOCH_COMPLETED)
-    def log_unit_convergence(engine):
-        weights = model[1].weight.detach()
-        sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
-        visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
-
-        fig = plt.figure()
-        plt.bar(range(sums.shape[0]), sums)
-        plt.xlabel("hidden units")
-        plt.ylabel("Sum of incoming weights")
-        fig.tight_layout()
-        visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
+    # @trainer.engine.on(Events.EPOCH_COMPLETED)
+    # def log_unit_convergence(engine):
+    #     weights = model[1].weight.detach()
+    #     sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
+    #     visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
+    #
+    #     fig = plt.figure()
+    #     plt.bar(range(sums.shape[0]), sums)
+    #     plt.xlabel("hidden units")
+    #     plt.ylabel("Sum of incoming weights")
+    #     fig.tight_layout()
+    #     visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
 
     # Create a TensorBoard logger
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
     tb_logger.writer = visualizer.writer
     tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
-                     event_name=Events.EPOCH_COMPLETED)
-    tb_logger.attach(trainer.engine,
-                     log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
-                     event_name=Events.EPOCH_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
+    #                  event_name=Events.EPOCH_COMPLETED)
+    # tb_logger.attach(trainer.engine,
+    #                  log_handler=WeightsHistHandler(model, layer_names=['linear1', 'linear2']),
+    #                  event_name=Events.EPOCH_COMPLETED)
     # tb_logger.attach(trainer.engine,
     #                  log_handler=ActivationsHistHandler(model, layer_names=['batch_norm', 'repu']),
     #                  event_name=Events.ITERATION_COMPLETED)
@@ -84,7 +81,8 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         run += '-' + run_postfix
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model([28 ** 2, 2000], batch_norm=False)
+    model = models.create_conv1_model(input_dim=28, input_channels=1, num_kernels=400, kernel_size=5, pool_size=2,
+                                      n=1, batch_norm=True)
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
@@ -97,7 +95,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     model.to(device)
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
+    train_loader, val_loader = data.get_data(params, dataset_name, subset=2000)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
@@ -105,7 +103,11 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
-    learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'])
+    # learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
+    learning_rule = {
+        'conv1': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=True),
+        'conv2': KrotovsRule(delta=0.3, k=2, norm=params['norm'], normalize=True),
+    }
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     lr_scheduler = LRScheduler(lr_scheduler)
@@ -116,8 +118,8 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-4)
-        h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=4,
-                                                                    factor=0.2)
+        h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=5,
+                                                                    factor=0.5)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,
                                       train_evaluator=h_train_evaluator, evaluator=h_evaluator, device=device)
 
@@ -134,7 +136,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_evaluator.engine.add_event_handler(Events.EPOCH_COMPLETED, h_handler, {'m': model})
 
         # Early stopping
-        h_es_handler = EarlyStopping(patience=10,
+        h_es_handler = EarlyStopping(patience=15,
                                      min_delta=0.0001,
                                      score_function=lambda engine: engine.state.metrics['accuracy'],
                                      trainer=h_trainer.engine, cumulative_delta=True)
@@ -153,7 +155,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
                              device=device)
 
     # Metrics
-    UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+    # UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
     if args.gpu_metrics and device == 'cuda':
         GpuInfo().attach(trainer.engine, name='gpu')
 
@@ -161,7 +163,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=500)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=100)
 
 
 if __name__ == '__main__':
