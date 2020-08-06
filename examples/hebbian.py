@@ -81,8 +81,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         run += '-' + run_postfix
 
     # Loading the model and possibly initial weights
-    model = models.create_conv1_model(input_dim=28, input_channels=1, num_kernels=400, kernel_size=5, pool_size=2,
-                                      n=1, batch_norm=True)
+    model = models.create_fc1_model(hu=[28 ** 2, 100], n=1, batch_norm=False)
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
@@ -95,7 +94,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     model.to(device)
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name, subset=2000)
+    train_loader, val_loader = data.get_data(params, dataset_name)
 
     # Creating the TensorBoard visualizer and writing some initial statistics
     visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
@@ -103,11 +102,11 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
-    # learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
-    learning_rule = {
-        'conv1': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=True),
-        'conv2': KrotovsRule(delta=0.3, k=2, norm=params['norm'], normalize=True),
-    }
+    learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
+    # learning_rule = {
+    #     'conv1': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=True),
+    #     'conv2': KrotovsRule(delta=0.3, k=2, norm=params['norm'], normalize=True),
+    # }
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
     lr_scheduler = LRScheduler(lr_scheduler)
@@ -192,4 +191,4 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    main(args_, params_, dataset_name='mnist-fashion')
+    main(args_, params_, dataset_name='mnist')
