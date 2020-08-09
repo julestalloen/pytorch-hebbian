@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -5,6 +6,7 @@ import time
 from argparse import ArgumentParser, Namespace
 
 import torch
+import torchvision
 from ignite.contrib.handlers import LRScheduler
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.contrib.metrics import GpuInfo
@@ -15,15 +17,15 @@ import data
 import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
+from pytorch_hebbian.handlers.tensorboard_logger import WeightsImageHandler
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer, params):
+def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, train_loader, params):
     # Learning rate scheduling
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
 
@@ -48,7 +50,24 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, _, visualizer,
 
     # Create a TensorBoard logger
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
-    tb_logger.writer = visualizer.writer
+    model = copy.deepcopy(model).cpu()
+    images, labels = next(iter(train_loader))
+    tb_logger.writer.add_graph(model, images)
+    tb_logger.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
+    tb_logger.writer.add_hparams(params, {})
+
+    # noinspection PyTypeChecker
+    tb_logger.attach_output_handler(
+        evaluator.engine,
+        event_name=Events.COMPLETED,
+        tag="validation",
+        metric_names="all",
+        global_step_transform=global_step_from_engine(trainer.engine),
+    )
+    input_shape = tuple(next(iter(train_loader))[0].shape[1:])
+    tb_logger.attach(trainer.engine,
+                     log_handler=WeightsImageHandler(model, input_shape),
+                     event_name=Events.EPOCH_COMPLETED)
     tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
     # tb_logger.attach(trainer.engine,
     #                  log_handler=WeightsScalarHandler(model, layer_names=['linear1', 'linear2']),
@@ -79,6 +98,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     run = 'heb/{}/{}'.format(dataset_name, identifier)
     if run_postfix:
         run += '-' + run_postfix
+    print(run)
 
     # Loading the model and possibly initial weights
     model = models.create_fc1_model(hu=[28 ** 2, 100], n=1, batch_norm=False)
@@ -95,10 +115,6 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name)
-
-    # Creating the TensorBoard visualizer and writing some initial statistics
-    visualizer = TensorBoardVisualizer(run=run, log_dir=args.log_dir)
-    visualizer.visualize_stats(model, train_loader, params)
 
     # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
     epochs = params['epochs']
@@ -147,11 +163,10 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         return h_trainer, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, score_name='accuracy',
-                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=500,
+                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=2,
                                  init_function=init_function)
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
-                             freeze_layers=freeze_layers, evaluator=evaluator, visualizer=visualizer,
-                             device=device)
+                             freeze_layers=freeze_layers, evaluator=evaluator, device=device)
 
     # Metrics
     # UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
@@ -159,10 +174,10 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         GpuInfo().attach(trainer.engine, name='gpu')
 
     # Handlers
-    attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, params)
+    attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, train_loader, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs, eval_every=100)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs)
 
 
 if __name__ == '__main__':

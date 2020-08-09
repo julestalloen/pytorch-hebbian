@@ -33,7 +33,7 @@ class HebbianEvaluator:
 
     def __init__(self, model: torch.nn.Module, score_name: str, score_function: Callable,
                  init_function: Callable[[torch.nn.Module], tuple] = None, epochs: int = 100,
-                 supervised_from: int = None, supervised_eval_every: int = 1):
+                 supervised_from: int = None):
         self.model = model
         self.score_name = score_name
         self.score_function = score_function
@@ -43,7 +43,6 @@ class HebbianEvaluator:
             self.init_function = init_function
         self.epochs = epochs
         self.supervised_from = supervised_from
-        self.supervised_eval_every = supervised_eval_every
         self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
         self.engine = self.create_hebbian_evaluator(self._run)
@@ -113,8 +112,7 @@ class HebbianEvaluator:
             except AttributeError:
                 pass
 
-        self._trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs,
-                          eval_every=self.supervised_eval_every)
+        self._trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs)
 
     def run(self, *args, **kwargs):
         self.engine.run(*args, **kwargs)

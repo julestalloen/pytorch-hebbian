@@ -1,5 +1,4 @@
 import logging
-import os
 
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
@@ -9,7 +8,6 @@ from pytorch_hebbian import config
 from pytorch_hebbian.learning_rules import OjasRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 
 def main():
@@ -26,12 +24,10 @@ def main():
     # Creating the learning rule, optimizer and trainer
     learning_rule = OjasRule()
     optimizer = Local(named_params=model.named_parameters(), lr=0.01)
-    visualizer = TensorBoardVisualizer(run='oja-test',
-                                       log_dir=os.path.join(config.OUTPUT_DIR, 'tensorboard', 'runs.temp'))
-    trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, visualizer=visualizer)
+    trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, epochs=1, vis_weights_every=1)
+    trainer.run(train_loader=train_loader, epochs=1)
 
 
 if __name__ == '__main__':

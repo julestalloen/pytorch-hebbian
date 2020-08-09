@@ -3,7 +3,7 @@ import os
 import time
 
 import torch
-from ignite.contrib.handlers.base_logger import global_step_from_engine
+from ignite.contrib.handlers import global_step_from_engine
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
@@ -14,12 +14,11 @@ from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.handlers.tensorboard_logger import *
 from pytorch_hebbian.trainers import SupervisedTrainer
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, visualizer, params):
+def attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, params):
     # Learning rate scheduling
     evaluator.engine.add_event_handler(Events.COMPLETED,
                                        lambda engine: lr_scheduler.step(engine.state.metrics['accuracy']))
@@ -43,7 +42,6 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluato
 
     # TensorBoard logger
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
-    tb_logger.writer = visualizer.writer
     tb_logger.attach(trainer.engine, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.EPOCH_STARTED)
     tb_logger.attach(trainer.engine, log_handler=WeightsScalarHandler(model), event_name=Events.EPOCH_COMPLETED)
     tb_logger.attach(trainer.engine, log_handler=WeightsHistHandler(model), event_name=Events.EPOCH_COMPLETED)
@@ -72,6 +70,7 @@ def main(params, dataset_name, transfer_learning=False):
         run += "-tl"
     if 'train_all' in params and params['train_all']:
         run += "-test"
+    print(run)
 
     # Loading the model and possibly initial weights
     model = models.create_fc1_model(hu=[28 ** 2, 2000], n=1.5, batch_norm=True)
@@ -82,10 +81,6 @@ def main(params, dataset_name, transfer_learning=False):
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=params['train_subset'])
 
-    # Creating the TensorBoard visualizer and writing some initial statistics
-    visualizer = TensorBoardVisualizer(run=run)
-    visualizer.visualize_stats(model, train_loader, params)
-
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
@@ -93,12 +88,12 @@ def main(params, dataset_name, transfer_learning=False):
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, train_evaluator=train_evaluator,
-                                evaluator=evaluator, visualizer=visualizer)
+                                evaluator=evaluator)
 
-    attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, visualizer, params)
+    attach_handlers(run, model, optimizer, lr_scheduler, trainer, train_evaluator, evaluator, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
 
 
 if __name__ == '__main__':

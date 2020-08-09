@@ -1,9 +1,13 @@
+import math
 from collections import defaultdict
 from functools import partial
 
+import numpy as np
 import torch
+import torchvision
 from ignite.contrib.handlers.base_logger import BaseHandler, BaseWeightsScalarHandler, BaseWeightsHistHandler
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger
+from matplotlib import pyplot as plt
 
 __all__ = [
     'WeightsScalarHandler',
@@ -11,6 +15,7 @@ __all__ = [
     'NumActivationsScalarHandler',
     'ActivationsScalarHandler',
     'ActivationsHistHandler',
+    'WeightsImageHandler',
 ]
 
 
@@ -215,3 +220,52 @@ class ActivationsHistHandler(BaseWeightsHistHandler):
                 values=output.detach().cpu().numpy(),
                 global_step=global_step,
             )
+
+
+class WeightsImageHandler(BaseHandler):
+    def __init__(self, model: torch.nn.Module, input_shape):
+        self.model = model
+        self.input_shape = input_shape
+
+    def __call__(self, engine, logger, event_name):
+        if not isinstance(logger, TensorboardLogger):
+            raise RuntimeError("Handler 'WeightsImageHandler' works only with TensorboardLogger")
+
+        with torch.no_grad():
+            first_trainable = True
+            for idx, (name, layer) in enumerate(self.model.named_children()):
+                if type(layer) == torch.nn.Linear and first_trainable:
+                    # Only visualize a Linear layer if it is the first layer after the input
+                    weights = layer.weight.view(-1, *self.input_shape)
+                    first_trainable = False
+                elif type(layer) == torch.nn.Conv2d:
+                    weights = layer.weight
+                    if self.input_shape[0] > 1 and idx == 0:
+                        weights = weights.view(-1, self.input_shape[0], *weights.shape[2:])
+                    else:
+                        weights = weights.view(-1, 1, *weights.shape[2:])
+                    first_trainable = False
+                else:
+                    continue
+
+                num_weights = weights.shape[0]
+                nrow = math.ceil(math.sqrt(num_weights))
+                grid = torchvision.utils.make_grid(weights, nrow=nrow)
+
+                fig = plt.figure()
+                if weights.shape[1] == 1:
+                    grid_np = grid[0, :].cpu().numpy()
+                    nc = np.amax(np.absolute(grid_np))
+                    im = plt.imshow(grid_np, cmap='bwr', vmin=-nc, vmax=nc, interpolation='nearest')
+                    plt.colorbar(im, ticks=[np.amin(grid_np), 0, np.amax(grid_np)])
+                else:
+                    grid_np = np.transpose(grid.cpu().numpy(), (1, 2, 0))
+                    grid_min = np.amin(grid_np)
+                    grid_max = np.amax(grid_np)
+                    grid_np = (grid_np - grid_min) / (grid_max - grid_min)
+                    plt.imshow(grid_np, interpolation='nearest')
+                plt.axis('off')
+                fig.tight_layout()
+
+                global_step = engine.state.get_event_attrib_value(event_name)
+                logger.writer.add_figure(tag=name + '/weight', figure=fig, global_step=global_step)

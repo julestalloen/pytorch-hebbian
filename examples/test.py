@@ -9,7 +9,6 @@ import models
 from pytorch_hebbian import config
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.utils import load_weights
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -38,10 +37,6 @@ def main(params):
 
     evaluator.run(test_loader)
     print(evaluator.metrics)
-
-    # Save the final parameters with its corresponding metrics
-    visualizer = TensorBoardVisualizer(run=run)
-    visualizer.writer.add_hparams(params, evaluator.metrics)
 
 
 if __name__ == '__main__':

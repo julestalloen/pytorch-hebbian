@@ -10,7 +10,6 @@ from pytorch_hebbian import config, utils
 from pytorch_hebbian import nn
 from pytorch_hebbian.evaluators import SupervisedEvaluator
 from pytorch_hebbian.trainers import SupervisedTrainer
-from pytorch_hebbian.visualizers import TensorBoardVisualizer
 from supervised import attach_handlers
 
 PATH = os.path.dirname(os.path.abspath(__file__))
@@ -35,10 +34,6 @@ def main(params, dataset_name, transfer_learning=False):
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
 
-    # Creating the TensorBoard visualizer and writing some initial statistics
-    visualizer = TensorBoardVisualizer(run=run)
-    visualizer.visualize_stats(model, train_loader, params)
-
     # Creating the criterion, optimizer, optimizer, evaluator and trainer
     criterion = nn.SPELoss(m=8, beta=0.01)
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
@@ -46,12 +41,12 @@ def main(params, dataset_name, transfer_learning=False):
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, train_evaluator=train_evaluator,
-                                evaluator=evaluator, visualizer=visualizer)
+                                evaluator=evaluator)
 
     attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, visualizer, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'], eval_every=1)
+    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=params['epochs'])
 
 
 if __name__ == '__main__':
