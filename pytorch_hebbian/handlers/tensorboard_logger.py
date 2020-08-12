@@ -269,3 +269,4 @@ class WeightsImageHandler(BaseHandler):
 
                 global_step = engine.state.get_event_attrib_value(event_name)
                 logger.writer.add_figure(tag=name + '/weight', figure=fig, global_step=global_step)
+                plt.close()

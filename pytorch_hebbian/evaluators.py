@@ -31,6 +31,7 @@ class SimpleEngine(Engine):
 class Evaluator(ABC):
     def __init__(self):
         self.engine = None
+        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
     def attach(self, engine, event_name, *args, **kwargs):
         if event_name not in State.event_to_attr:
@@ -59,7 +60,6 @@ class HebbianEvaluator(Evaluator):
             self.init_function = init_function
         self.epochs = epochs
         self.supervised_from = supervised_from
-        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
         self.engine = self.create_hebbian_evaluator(self._run)
         self._init_metrics()
