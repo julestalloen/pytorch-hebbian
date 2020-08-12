@@ -7,9 +7,8 @@ from argparse import ArgumentParser, Namespace
 
 import torch
 import torchvision
-from ignite.contrib.handlers import LRScheduler
+from ignite.contrib.handlers import LRScheduler, ProgressBar
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
-from ignite.contrib.metrics import GpuInfo
 from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint, global_step_from_engine, EarlyStopping
 
@@ -18,6 +17,7 @@ import models
 from pytorch_hebbian import config, utils
 from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
 from pytorch_hebbian.handlers.tensorboard_logger import WeightsImageHandler
+from pytorch_hebbian.handlers.tqdm_logger import TqdmLogger
 from pytorch_hebbian.learning_rules import KrotovsRule
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
@@ -25,8 +25,29 @@ from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, train_loader, params):
+def attach_handlers(run, model, optimizer, trainer, evaluator, train_loader, val_loader, params):
+    # Metrics
+    # UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+
+    # Tqdm logger
+    pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
+    pbar.attach(trainer.engine, metric_names='all')
+    tqdm_logger = TqdmLogger(pbar=pbar)
+    # noinspection PyTypeChecker
+    tqdm_logger.attach_output_handler(
+        evaluator.engine,
+        event_name=Events.COMPLETED,
+        tag="validation",
+        global_step_transform=global_step_from_engine(trainer.engine),
+    )
+
+    # Evaluator
+    evaluator.attach(trainer.engine, Events.EPOCH_COMPLETED, train_loader, val_loader)
+
     # Learning rate scheduling
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
+                                                     lr_lambda=lambda epoch: 1 - epoch / params['epochs'])
+    lr_scheduler = LRScheduler(lr_scheduler)
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, lr_scheduler)
 
     # Early stopping
@@ -50,9 +71,8 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, tra
 
     # Create a TensorBoard logger
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
-    model = copy.deepcopy(model).cpu()
     images, labels = next(iter(train_loader))
-    tb_logger.writer.add_graph(model, images)
+    tb_logger.writer.add_graph(copy.deepcopy(model).cpu(), images)
     tb_logger.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
     tb_logger.writer.add_hparams(params, {})
 
@@ -89,7 +109,7 @@ def attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, tra
     #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
     #                                                       layer_names=['batch_norm', 'repu']),
     #                  event_name=Events.ITERATION_COMPLETED)
-    tb_logger.close()
+    # tb_logger.close()
 
 
 def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
@@ -116,16 +136,9 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name)
 
-    # Creating the learning rule, optimizer, learning rate scheduler, evaluator and trainer
-    epochs = params['epochs']
+    # Creating the learning rule, optimizer, evaluator and trainer
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
-    # learning_rule = {
-    #     'conv1': KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=True),
-    #     'conv2': KrotovsRule(delta=0.3, k=2, norm=params['norm'], normalize=True),
-    # }
     optimizer = Local(named_params=model.named_parameters(), lr=params['lr'])
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 1 - epoch / epochs)
-    lr_scheduler = LRScheduler(lr_scheduler)
 
     # Initialization function called before each evaluation run of the Hebbian evaluator
     def init_function(h_model):
@@ -135,8 +148,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-4)
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=5,
                                                                     factor=0.5)
-        h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion,
-                                      train_evaluator=h_train_evaluator, evaluator=h_evaluator, device=device)
+        h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion, device=device)
 
         # Learning rate scheduling
         # The PyTorch Ignite LRScheduler class does not work with ReduceLROnPlateau
@@ -158,26 +170,19 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_es_handler.logger.setLevel(logging.DEBUG)
         h_evaluator.engine.add_event_handler(Events.COMPLETED, h_es_handler)
 
-        h_trainer.pbar.persist = False
-
-        return h_trainer, h_evaluator
+        return h_trainer, h_train_evaluator, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, score_name='accuracy',
                                  score_function=lambda engine: engine.state.metrics['accuracy'], epochs=2,
-                                 init_function=init_function)
+                                 init_function=init_function, supervised_from=-1)
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
-                             freeze_layers=freeze_layers, evaluator=evaluator, device=device)
-
-    # Metrics
-    # UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
-    if args.gpu_metrics and device == 'cuda':
-        GpuInfo().attach(trainer.engine, name='gpu')
+                             freeze_layers=freeze_layers, device=device)
 
     # Handlers
-    attach_handlers(run, model, optimizer, lr_scheduler, trainer, evaluator, train_loader, params)
+    attach_handlers(run, model, optimizer, trainer, evaluator, train_loader, val_loader, params)
 
     # Running the trainer
-    trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=epochs)
+    trainer.run(train_loader=train_loader, epochs=params['epochs'])
 
 
 if __name__ == '__main__':
@@ -192,8 +197,8 @@ if __name__ == '__main__':
                         help='model weights to initialize training')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'],
                         help="'cuda' (GPU) or 'cpu'")
-    parser.add_argument('--gpu_metrics', action='store_true', default=False,
-                        help='enable gpu metrics in the trainer progress bar')
+    # parser.add_argument('--gpu_metrics', action='store_true', default=False,
+    #                     help='enable gpu metrics in the trainer progress bar')
     args_ = parser.parse_args()
 
     with open(os.path.join(PATH, args_.json)) as f:

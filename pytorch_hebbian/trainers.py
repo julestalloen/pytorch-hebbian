@@ -1,17 +1,15 @@
 import logging
 from abc import ABC
 from collections import namedtuple
-from typing import Union, Optional, Dict, List, Callable, Sequence
+from typing import Union, Optional, Dict, List, Sequence
 
 import torch
-from ignite.contrib.handlers import ProgressBar, global_step_from_engine
-from ignite.engine import Engine, Events, create_supervised_trainer
+from ignite.engine import Engine, create_supervised_trainer
 from ignite.metrics import RunningAverage
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from pytorch_hebbian import utils, config
-from pytorch_hebbian.handlers.tqdm_logger import TqdmLogger, OutputHandler
+from pytorch_hebbian import utils
 from pytorch_hebbian.learning_rules import LearningRule
 
 
@@ -21,76 +19,14 @@ class Trainer(ABC):
     Supports (optional) evaluating and visualizing by default.
     """
 
-    def __init__(self, engine, model: torch.nn.Module, evaluator=None, train_evaluator=None,
-                 evaluator_args: Callable[[], dict] = None, device: Optional[Union[str, torch.device]] = None):
+    def __init__(self, engine, model: torch.nn.Module, device: Optional[Union[str, torch.device]] = None):
         self.engine = engine
         self.model = model
-        self.evaluator = evaluator
-        self.train_evaluator = train_evaluator
         self.device = utils.get_device(device)
-        self.train_loader = None
-        self.val_loader = None
         self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
-        # Move the model to the appropriate device
-        self.model.to(device)
-
-        if evaluator_args is None:
-            self.evaluator_args = lambda: {'val_loader': self.val_loader}
-        else:
-            self.evaluator_args = evaluator_args
-
-        self.pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
-        self.pbar.attach(self.engine, metric_names='all')
-        self.tqdm_logger = TqdmLogger(pbar=self.pbar)
-
-        self._register_handlers()
-
-    def _register_handlers(self):
-        # if self.visualizer is not None:
-        #     @self.engine.on(Events.STARTED)
-        #     @self.engine.on(Events.ITERATION_COMPLETED)
-        #     def visualize_weights(engine):
-        #         if engine.state.iteration % self.vis_weights_every == 0:
-        #             input_shape = tuple(next(iter(self.train_loader))[0].shape[1:])
-        #             self.visualizer.visualize_weights(self.model, input_shape, engine.state.epoch)
-
-        if self.train_evaluator is not None:
-            self.tqdm_logger.attach(self.train_evaluator.engine,
-                                    log_handler=OutputHandler(tag="train",
-                                                              global_step_transform=global_step_from_engine(
-                                                                  self.engine)),
-                                    event_name=Events.COMPLETED)
-
-            @self.engine.on(Events.EPOCH_COMPLETED)
-            def log_training_results(_):
-                self.train_evaluator.run(self.train_loader)
-
-                # if self.visualizer is not None:
-                #     self.visualizer.visualize_metrics(self.train_evaluator.engine.state.metrics,
-                #                                       engine.state.epoch, train=True)
-
-        if self.evaluator is not None:
-            self.tqdm_logger.attach(self.evaluator.engine,
-                                    log_handler=OutputHandler(tag="validation",
-                                                              global_step_transform=global_step_from_engine(
-                                                                  self.engine)),
-                                    event_name=Events.COMPLETED)
-
-            @self.engine.on(Events.EPOCH_COMPLETED)
-            def log_validation_results(_):
-                self.evaluator.run(**self.evaluator_args())
-
-                # if self.visualizer is not None:
-                #     self.visualizer.visualize_metrics(self.evaluator.engine.state.metrics, engine.state.epoch)
-
-    def run(self, train_loader: DataLoader, val_loader: DataLoader = None, epochs: int = 10):
-        self.train_loader = train_loader
-        self.val_loader = val_loader
-
-        self.logger.info('Received {} training samples.'.format(len(train_loader.dataset)))
-        self.logger.info('Training {} epoch(s).'.format(epochs))
-
+    def run(self, train_loader: DataLoader, epochs: int = 10):
+        self.logger.info('Training for {} epoch(s).'.format(epochs))
         self.engine.run(train_loader, max_epochs=epochs)
 
 
@@ -101,18 +37,16 @@ class SupervisedTrainer(Trainer):
         model: The model to be trained.
         optimizer: The optimizer used to train the model.
         criterion: The criterion used for calculating the loss.
-        evaluator: An optional evaluator.
         device: The device to be used.
     """
 
-    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion, train_evaluator=None, evaluator=None,
+    def __init__(self, model: torch.nn.Module, optimizer: Optimizer, criterion,
                  device: Optional[Union[str, torch.device]] = None):
         device = utils.get_device(device)
         engine = create_supervised_trainer(model, optimizer, criterion, device=device)
         RunningAverage(output_transform=lambda x: x).attach(engine, 'loss')
 
-        super().__init__(engine=engine, model=model, evaluator=evaluator, train_evaluator=train_evaluator,
-                         device=device)
+        super().__init__(engine=engine, model=model, device=device)
 
 
 class HebbianTrainer(Trainer):
@@ -126,7 +60,6 @@ class HebbianTrainer(Trainer):
         learning_rule (LearningRule | Dict[str, LearningRule]):
             The learning rule(s) used to update the model weights.
         optimizer (Optimizer): The optimizer used to perform the weight updates.
-        evaluator: An optional evaluator.
         supervised_from (int): From which layer (name) the training should be performed supervised.
         freeze_layers (list): Layers (names) to freeze during training.
         device (Optional[Union[str, torch.device]]): The device to perform the training on.
@@ -138,8 +71,8 @@ class HebbianTrainer(Trainer):
     """
 
     def __init__(self, model: torch.nn.Sequential, learning_rule: Union[LearningRule, Dict[str, LearningRule]],
-                 optimizer: Optimizer, evaluator=None, supervised_from: int = -1,
-                 freeze_layers: List[str] = None, device: Optional[Union[str, torch.device]] = None):
+                 optimizer: Optimizer, supervised_from: int = -1, freeze_layers: List[str] = None,
+                 device: Optional[Union[str, torch.device]] = None):
         device = utils.get_device(device)
         engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
         self.supervised_from = supervised_from
@@ -162,12 +95,7 @@ class HebbianTrainer(Trainer):
         else:
             self.learning_rule.init_layers(self.layers)
 
-        super().__init__(engine=engine, model=model, evaluator=evaluator, device=device,
-                         evaluator_args=lambda: {
-                             'train_loader': self.train_loader,
-                             'val_loader': self.val_loader,
-                             'supervised_from': self.supervised_from,
-                         })
+        super().__init__(engine=engine, model=model, device=device)
 
         self.logger.info(
             "Received {} trainable layer(s): {}.".format(len(self.layers), [lyr.name for lyr in self.layers]))

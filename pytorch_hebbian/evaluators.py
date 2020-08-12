@@ -1,4 +1,5 @@
 import logging
+from abc import ABC
 from typing import Callable
 
 import torch
@@ -6,10 +7,11 @@ from ignite.engine import Events, Engine, State, create_supervised_evaluator
 from ignite.handlers import EarlyStopping
 from ignite.metrics import Accuracy, Loss
 
+from pytorch_hebbian import utils
 from pytorch_hebbian.trainers import SupervisedTrainer
 
 
-class CustomEngine(Engine):
+class SimpleEngine(Engine):
     """Custom engine with custom run function.
 
     This engine has only metrics in its state and only fires 2 events.
@@ -21,19 +23,33 @@ class CustomEngine(Engine):
         self._run_function = run_function
 
     def run(self, *args, **kwargs):
-        if self.state is None:
-            self.state = State()
-
         self._fire_event(Events.STARTED)
         self._run_function(*args, **kwargs)
         self._fire_event(Events.COMPLETED)
 
 
-class HebbianEvaluator:
+class Evaluator(ABC):
+    def __init__(self):
+        self.engine = None
 
+    def attach(self, engine, event_name, *args, **kwargs):
+        if event_name not in State.event_to_attr:
+            raise RuntimeError("Unknown event name '{}'".format(event_name))
+
+        return engine.add_event_handler(event_name, self, *args, **kwargs)
+
+    def run(self, *args, **kwargs):
+        self.engine.run(*args, **kwargs)
+
+    def __call__(self, engine, *args, **kwargs):
+        self.run(*args, **kwargs)
+
+
+class HebbianEvaluator(Evaluator):
     def __init__(self, model: torch.nn.Module, score_name: str, score_function: Callable,
                  init_function: Callable[[torch.nn.Module], tuple] = None, epochs: int = 100,
                  supervised_from: int = None):
+        super().__init__()
         self.model = model
         self.score_name = score_name
         self.score_function = score_function
@@ -50,7 +66,7 @@ class HebbianEvaluator:
 
     @staticmethod
     def create_hebbian_evaluator(run_function) -> Engine:
-        return CustomEngine(run_function=run_function)
+        return SimpleEngine(run_function=run_function)
 
     @staticmethod
     def _init_function(model):
@@ -59,8 +75,7 @@ class HebbianEvaluator:
         evaluator = SupervisedEvaluator(model=model, criterion=criterion)
         train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
         optimizer = torch.optim.Adam(params=model.parameters())
-        trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion,
-                                    train_evaluator=train_evaluator, evaluator=evaluator)
+        trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion)
 
         # Early stopping
         es_handler = EarlyStopping(patience=5,
@@ -69,14 +84,18 @@ class HebbianEvaluator:
                                    trainer=trainer.engine, cumulative_delta=True)
         evaluator.engine.add_event_handler(Events.COMPLETED, es_handler)
 
-        return trainer, evaluator
+        return trainer, train_evaluator, evaluator
 
     def _init_metrics(self):
         # self.metrics = {}
         self.best_score = None
 
-    def _init(self):
-        self._trainer, self._evaluator = self.init_function(self.model)
+    def _init(self, train_loader, val_loader):
+        self._trainer, self._train_evaluator, self._evaluator = self.init_function(self.model)
+
+        # Attach evaluators
+        self._train_evaluator.attach(self._trainer.engine, Events.EPOCH_COMPLETED, train_loader)
+        self._evaluator.attach(self._trainer.engine, Events.EPOCH_COMPLETED, val_loader)
 
         # Metric history saving
         @self._evaluator.engine.on(Events.COMPLETED)
@@ -89,43 +108,32 @@ class HebbianEvaluator:
 
         self._init_metrics()
 
-    def _run(self, train_loader, val_loader, supervised_from):
-        # Normally the trainer passes the supervised_from parameter to the evaluator. This value is overwritten if the
-        #   parameter was manually passed on creation of the evaluator
-        if self.supervised_from is not None:
-            supervised_from = self.supervised_from
+    def _run(self, train_loader, val_loader):
         self.logger.info(
-            "Supervised training from layer '{}'.".format(list(self.model.named_children())[supervised_from][0]))
+            "Supervised training from layer '{}'.".format(list(self.model.named_children())[self.supervised_from][0]))
 
-        self._init()
+        self._init(train_loader, val_loader)
 
         layers = list(self.model.children())
         # Freeze the Hebbian trained layers
-        for layer in layers[:supervised_from]:
+        for layer in layers[:self.supervised_from]:
             for param in layer.parameters():
                 param.requires_grad = False
 
         # Re-initialize weights for the supervised layers
-        for lyr in layers[supervised_from:]:
+        for lyr in layers[self.supervised_from:]:
             try:
                 lyr.reset_parameters()
             except AttributeError:
                 pass
 
-        self._trainer.run(train_loader=train_loader, val_loader=val_loader, epochs=self.epochs)
-
-    def run(self, *args, **kwargs):
-        self.engine.run(*args, **kwargs)
+        self._trainer.run(train_loader=train_loader, epochs=self.epochs)
 
 
-class SupervisedEvaluator:
-
+class SupervisedEvaluator(Evaluator):
     def __init__(self, model, criterion, metrics=None, device=None):
-        if device is None:
-            if torch.cuda.is_available():
-                device = 'cuda'
-            else:
-                device = 'cpu'
+        super().__init__()
+        self.device = utils.get_device(device)
 
         if metrics is None:
             metrics = {
@@ -134,8 +142,4 @@ class SupervisedEvaluator:
             }
 
         self.engine = create_supervised_evaluator(model, metrics=metrics, device=device)
-        self.metrics = {}  # engine.state.metrics only created on engine run
-
-    def run(self, val_loader):
-        self.engine.run(val_loader)
         self.metrics = self.engine.state.metrics
