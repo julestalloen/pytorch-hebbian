@@ -37,7 +37,7 @@ def plot_to_img(fig):
 
 def extract_image_patches(x, kernel_size, stride=(1, 1), dilation=1, padding=0):
     # TODO: implement dilation and padding
-    # TODO: does the order in which the patches are returned matter?
+    #   does the order in which the patches are returned matter?
     b, c, h, w = x.shape
 
     # Extract patches

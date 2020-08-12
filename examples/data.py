@@ -11,27 +11,36 @@ from pytorch_hebbian import config, utils
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-# TODO: only load test data when needed
 def get_data(params, dataset_name, subset=None):
+    load_test = 'train_all' in params and params['train_all']
+    test_dataset = None
+
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
     if dataset_name == 'mnist':
         dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-        test_dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, train=False, transform=transform)
+        if load_test:
+            test_dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True, train=False,
+                                                transform=transform)
     elif dataset_name == 'mnist-fashion':
         dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, transform=transform)
-        test_dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, train=False,
-                                                   transform=transform)
-    else:
+        if load_test:
+            test_dataset = datasets.mnist.FashionMNIST(root=config.DATASETS_DIR, download=True, train=False,
+                                                       transform=transform)
+    elif dataset_name == "cifar-10":
         dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, transform=transform)
-        test_dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, train=False, transform=transform)
+        if load_test:
+            test_dataset = datasets.cifar.CIFAR10(root=config.DATASETS_DIR, download=True, train=False,
+                                                  transform=transform)
+    else:
+        raise AttributeError('Dataset not found')
 
     if subset is not None and subset > 0:
         dataset = Subset(dataset, random.sample(range(len(dataset)), subset))
 
-    if 'train_all' in params and params['train_all']:
+    if load_test:
         train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True)
         val_loader = DataLoader(test_dataset, batch_size=params['val_batch_size'], shuffle=False)
     else:
