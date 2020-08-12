@@ -19,15 +19,16 @@ from pytorch_hebbian.evaluators import HebbianEvaluator, SupervisedEvaluator
 from pytorch_hebbian.handlers.tensorboard_logger import WeightsImageHandler
 from pytorch_hebbian.handlers.tqdm_logger import TqdmLogger
 from pytorch_hebbian.learning_rules import KrotovsRule
+from pytorch_hebbian.metrics import UnitConvergence
 from pytorch_hebbian.optimizers import Local
 from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, trainer, evaluator, train_loader, val_loader, params):
+def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params):
     # Metrics
-    # UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+    UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
 
     # Tqdm logger
     pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
@@ -42,7 +43,7 @@ def attach_handlers(run, model, optimizer, trainer, evaluator, train_loader, val
     )
 
     # Evaluator
-    evaluator.attach(trainer.engine, Events.EPOCH_COMPLETED, train_loader, val_loader)
+    evaluator.attach(trainer.engine, Events.EPOCH_COMPLETED(every=10), train_loader, val_loader)
 
     # Learning rate scheduling
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
@@ -130,8 +131,8 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Device selection
     device = utils.get_device(args.device)
-    print("Device set to '{}'.".format(device))
     model.to(device)
+    print("Device set to '{}'.".format(device))
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name)
@@ -149,6 +150,25 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=5,
                                                                     factor=0.5)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion, device=device)
+
+        # Tqdm logger
+        h_pbar = ProgressBar(persist=False, bar_format=config.IGNITE_BAR_FORMAT)
+        h_pbar.attach(h_trainer.engine, metric_names='all')
+        h_tqdm_logger = TqdmLogger(pbar=h_pbar)
+        # noinspection PyTypeChecker
+        h_tqdm_logger.attach_output_handler(
+            h_evaluator.engine,
+            event_name=Events.COMPLETED,
+            tag="validation",
+            global_step_transform=global_step_from_engine(h_trainer.engine),
+        )
+        # noinspection PyTypeChecker
+        h_tqdm_logger.attach_output_handler(
+            h_train_evaluator.engine,
+            event_name=Events.COMPLETED,
+            tag="train",
+            global_step_transform=global_step_from_engine(h_trainer.engine),
+        )
 
         # Learning rate scheduling
         # The PyTorch Ignite LRScheduler class does not work with ReduceLROnPlateau
@@ -173,13 +193,13 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         return h_trainer, h_train_evaluator, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, score_name='accuracy',
-                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=2,
+                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=10,
                                  init_function=init_function, supervised_from=-1)
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
                              freeze_layers=freeze_layers, device=device)
 
     # Handlers
-    attach_handlers(run, model, optimizer, trainer, evaluator, train_loader, val_loader, params)
+    attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, epochs=params['epochs'])

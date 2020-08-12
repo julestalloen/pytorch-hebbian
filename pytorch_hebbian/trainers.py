@@ -26,7 +26,6 @@ class Trainer(ABC):
         self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
 
     def run(self, train_loader: DataLoader, epochs: int = 10):
-        self.logger.info('Training for {} epoch(s).'.format(epochs))
         self.engine.run(train_loader, max_epochs=epochs)
 
 
