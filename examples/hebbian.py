@@ -43,7 +43,7 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
     )
 
     # Evaluator
-    evaluator.attach(trainer.engine, Events.EPOCH_COMPLETED(every=10), train_loader, val_loader)
+    evaluator.attach(trainer.engine, Events.EPOCH_COMPLETED(every=100), train_loader, val_loader)
 
     # Learning rate scheduling
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
@@ -56,19 +56,6 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
                                  require_empty=False,
                                  global_step_transform=global_step_from_engine(trainer.engine))
     trainer.engine.add_event_handler(Events.EPOCH_COMPLETED, mc_handler, {'m': model})
-
-    # @trainer.engine.on(Events.EPOCH_COMPLETED)
-    # def log_unit_convergence(engine):
-    #     weights = model[1].weight.detach()
-    #     sums = torch.sum(torch.pow(torch.abs(weights), params['norm']), 1).cpu()
-    #     visualizer.writer.add_scalar('unit_convergence', engine.state.metrics['unit_conv'], engine.state.epoch)
-    #
-    #     fig = plt.figure()
-    #     plt.bar(range(sums.shape[0]), sums)
-    #     plt.xlabel("hidden units")
-    #     plt.ylabel("Sum of incoming weights")
-    #     fig.tight_layout()
-    #     visualizer.writer.add_figure('unit_weight_sum', fig, engine.state.epoch)
 
     # Create a TensorBoard logger
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
@@ -84,6 +71,13 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
         tag="validation",
         metric_names="all",
         global_step_transform=global_step_from_engine(trainer.engine),
+    )
+    # noinspection PyTypeChecker
+    tb_logger.attach_output_handler(
+        trainer.engine,
+        event_name=Events.EPOCH_COMPLETED,
+        tag="train",
+        metric_names=["unit_conv"]
     )
     input_shape = tuple(next(iter(train_loader))[0].shape[1:])
     tb_logger.attach(trainer.engine,
@@ -193,7 +187,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         return h_trainer, h_train_evaluator, h_evaluator
 
     evaluator = HebbianEvaluator(model=model, score_name='accuracy',
-                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=10,
+                                 score_function=lambda engine: engine.state.metrics['accuracy'], epochs=500,
                                  init_function=init_function, supervised_from=-1)
     trainer = HebbianTrainer(model=model, learning_rule=learning_rule, optimizer=optimizer, supervised_from=-1,
                              freeze_layers=freeze_layers, device=device)
