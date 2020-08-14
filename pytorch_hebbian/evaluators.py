@@ -141,5 +141,5 @@ class SupervisedEvaluator(Evaluator):
                 'loss': Loss(criterion)
             }
 
-        self.engine = create_supervised_evaluator(model, metrics=metrics, device=device)
-        self.metrics = self.engine.state.metrics
+        self.engine = create_supervised_evaluator(model, metrics=metrics, device=self.device)
+        # self.metrics = self.engine.state.metrics

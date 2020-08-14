@@ -1,6 +1,7 @@
 import logging
 from abc import ABC
 from collections import namedtuple
+from functools import partial
 from typing import Union, Optional, Dict, List, Sequence
 
 import torch
@@ -71,11 +72,14 @@ class HebbianTrainer(Trainer):
 
     def __init__(self, model: torch.nn.Sequential, learning_rule: Union[LearningRule, Dict[str, LearningRule]],
                  optimizer: Optimizer, supervised_from: int = -1, freeze_layers: List[str] = None,
+                 complete_forward: bool = False, single_forward: bool = False,
                  device: Optional[Union[str, torch.device]] = None):
         device = utils.get_device(device)
         engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
+        self.complete_forward = complete_forward
+        self.single_forward = single_forward
         if self.freeze_layers is None:
             self.freeze_layers = []
 
@@ -99,6 +103,19 @@ class HebbianTrainer(Trainer):
         self.logger.info(
             "Received {} trainable layer(s): {}.".format(len(self.layers), [lyr.name for lyr in self.layers]))
 
+        if self.single_forward:
+            # Register hooks to store trainable layer outputs
+            self._hooks = {}
+            self._inputs = {}
+            self._outputs = {}
+            for lyr in self.layers:
+                self._hooks[lyr.name] = lyr.layer.register_forward_hook(
+                    partial(self._store_data_hook, layer_name=lyr.name))
+
+    def _store_data_hook(self, _, inp, output, layer_name):
+        self._inputs[layer_name] = inp[0]
+        self._outputs[layer_name] = output
+
     def _prepare_data(self, inputs, model, layer_index):
         """Prepare the inputs and layer weights to be passed to the learning rule.
 
@@ -107,7 +124,6 @@ class HebbianTrainer(Trainer):
             model: The model to be trained.
             layer_index: The index of the layer currently being trained.
         """
-        # TODO: make more efficient with single pass and hooks?
         layers = list(model.children())
         layer = layers[layer_index]
 
@@ -119,8 +135,9 @@ class HebbianTrainer(Trainer):
             for lyr in layers[:layer_index]:
                 x = lyr(x)
 
-        # TODO: TEMP to trigger forward hooks for remaining layers
-        model(inputs)
+        if self.complete_forward:
+            for lyr in layers[layer_index:]:
+                x = lyr(x)
 
         # Get the layer weight and input image patches
         if type(layer) == torch.nn.Linear:
@@ -137,6 +154,34 @@ class HebbianTrainer(Trainer):
         self.logger.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
         return x, w
 
+    def _prepare_data2(self, layer, layer_name):
+        x = self._inputs[layer_name]
+        y = self._outputs[layer_name]
+
+        # Get the layer weight and input image patches
+        if type(layer) == torch.nn.Linear:
+            w = layer.weight
+        elif type(layer) == torch.nn.Conv2d:
+            w = layer.weight
+            w = w.view(-1, layer.kernel_size[0] * layer.kernel_size[1])
+            x = utils.extract_image_patches(x, kernel_size=layer.kernel_size, stride=layer.stride,
+                                            padding=layer.padding, dilation=layer.dilation)
+        else:
+            raise TypeError("Unsupported layer type!")
+
+        x = x.view((x.shape[0], -1))
+        self.logger.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
+        return x, y, w
+
+    def _forward(self, inputs, model):
+        if self.complete_forward:
+            model(inputs)
+        else:
+            layers = list(model.children())
+            x = inputs
+            for lyr in layers[:self.supervised_from - 1]:
+                x = lyr(x)
+
     def create_hebbian_trainer(self, model: torch.nn.Module, learning_rule, optimizer, device=None, non_blocking=False,
                                prepare_batch=utils.prepare_batch,
                                output_transform=lambda x, y: 0):
@@ -144,11 +189,16 @@ class HebbianTrainer(Trainer):
             model.train()
             with torch.no_grad():
                 x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+                if self.single_forward:
+                    self._forward(x, model)
 
                 # Train layer per layer
                 for layer_index, layer_name, layer in self.layers:
                     self.logger.debug("Updating layer '{}' with shape {}.".format(layer, layer.weight.shape))
-                    inputs, weights = self._prepare_data(x, model, layer_index)
+                    if self.single_forward:
+                        inputs, _, weights = self._prepare_data2(layer, layer_name)
+                    else:
+                        inputs, weights = self._prepare_data(x, model, layer_index)
 
                     if type(learning_rule) == dict:
                         try:
