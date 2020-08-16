@@ -143,7 +143,7 @@ def main(params, dataset_name, transfer_learning=False):
     optimizer = torch.optim.Adam(params=model.parameters(), lr=params['lr'])
     train_evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
-    trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion)
+    trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion, device=device)
 
     es_handler, tb_logger = attach_handlers(run, model, optimizer, trainer, train_evaluator, evaluator, train_loader,
                                             val_loader, params)

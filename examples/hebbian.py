@@ -114,9 +114,8 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         run += '-' + run_postfix
     print("Starting run '{}'".format(run))
 
-    # Loading the model and possibly initial weights
+    # Loading the model and optionally initial weights for transfer learning
     model = models.create_conv1_model(28, 1, num_kernels=400, n=1, batch_norm=True)
-    # model = models.create_fc1_model([28 ** 2, 100])
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
