@@ -130,6 +130,11 @@ def main(params, dataset_name, transfer_learning=False):
         weights_path = "../output/models/heb-mnist-fashion-20200607-015911_m_100_acc=0.855.pth"
         model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['conv1'], freeze=True)
 
+    # Device selection
+    device = utils.get_device()
+    model.to(device)
+    print("Device set to '{}'.".format(device))
+
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=params['train_subset'])
 
