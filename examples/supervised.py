@@ -4,7 +4,6 @@ import os
 import time
 
 import torch
-import torchvision
 from ignite.contrib.handlers import global_step_from_engine, ProgressBar
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.engine import Events
@@ -72,8 +71,7 @@ def attach_handlers(run, model, optimizer, trainer, train_evaluator, evaluator, 
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
     images, labels = next(iter(train_loader))
     tb_logger.writer.add_graph(copy.deepcopy(model).cpu(), images)
-    tb_logger.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
-    tb_logger.writer.add_hparams(params, {})
+    tb_logger.writer.add_hparams(params, {'hparam/dummy': 0})
 
     # noinspection PyTypeChecker
     tb_logger.attach_output_handler(
@@ -112,24 +110,25 @@ def attach_handlers(run, model, optimizer, trainer, train_evaluator, evaluator, 
     #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
     #                                                       layer_names=['linear1', 'batch_norm', 'repu']),
     #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.close()
+
+    return es_handler, tb_logger
 
 
 def main(params, dataset_name, transfer_learning=False):
-    # Creating an identifier for this run
+    # # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'sup/{}/{}'.format(dataset_name, identifier)
+    run = '{}/sup/{}'.format(dataset_name, identifier)
     if transfer_learning:
         run += "-tl"
     if 'train_all' in params and params['train_all']:
         run += "-test"
-    print(run)
+    print("Starting run '{}'".format(run))
 
-    # Loading the model and possibly initial weights
-    model = models.create_fc1_model(hu=[28 ** 2, 100], n=1, batch_norm=False)
+    # Loading the model and optionally initial weights for transfer learning
+    model = models.create_conv1_model(28, 1, num_kernels=400, n=1, batch_norm=True)
     if transfer_learning:
-        weights_path = "../output/models/heb-mnist-fashion-20200522-174314_m_499.pth"
-        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['linear1'], freeze=True)
+        weights_path = "../output/models/heb-mnist-fashion-20200607-015911_m_100_acc=0.855.pth"
+        model = utils.load_weights(model, os.path.join(PATH, weights_path), layer_names=['conv1'], freeze=True)
 
     # Data loaders
     train_loader, val_loader = data.get_data(params, dataset_name, subset=params['train_subset'])
@@ -141,10 +140,15 @@ def main(params, dataset_name, transfer_learning=False):
     evaluator = SupervisedEvaluator(model=model, criterion=criterion)
     trainer = SupervisedTrainer(model=model, optimizer=optimizer, criterion=criterion)
 
-    attach_handlers(run, model, optimizer, trainer, train_evaluator, evaluator, train_loader, val_loader, params)
+    es_handler, tb_logger = attach_handlers(run, model, optimizer, trainer, train_evaluator, evaluator, train_loader,
+                                            val_loader, params)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, epochs=params['epochs'])
+
+    # Save the best score and close the TensorBoard logger
+    tb_logger.writer.add_hparams(params, {"hparam/accuracy": es_handler.best_score})
+    tb_logger.close()
 
 
 if __name__ == '__main__':
@@ -153,13 +157,13 @@ if __name__ == '__main__':
     logging.getLogger("pytorch_hebbian").setLevel(logging.INFO)
 
     params_ = {
-        'train_batch_size': 128,
-        'val_batch_size': 128,
+        'train_batch_size': 256,
+        'val_batch_size': 256,
         'val_split': 0.2,
         'epochs': 500,
         'lr': 1e-3,
-        'train_subset': 10000,
+        'train_subset': 20000,
         'train_all': False,
     }
 
-    main(params_, dataset_name='mnist', transfer_learning=False)
+    main(params_, dataset_name='mnist-fashion', transfer_learning=True)

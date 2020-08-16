@@ -6,7 +6,6 @@ import time
 from argparse import ArgumentParser, Namespace
 
 import torch
-import torchvision
 from ignite.contrib.handlers import LRScheduler, ProgressBar
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OptimizerParamsHandler
 from ignite.engine import Events
@@ -28,7 +27,7 @@ PATH = os.path.dirname(os.path.abspath(__file__))
 
 def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params):
     # Metrics
-    UnitConvergence(model[1], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+    UnitConvergence(model[0], learning_rule.norm).attach(trainer.engine, 'unit_conv')
 
     # Tqdm logger
     pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
@@ -61,7 +60,6 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
     tb_logger = TensorboardLogger(log_dir=os.path.join(config.TENSORBOARD_DIR, run))
     images, labels = next(iter(train_loader))
     tb_logger.writer.add_graph(copy.deepcopy(model).cpu(), images)
-    tb_logger.writer.add_image('input/samples', torchvision.utils.make_grid(images[:64]))
     tb_logger.writer.add_hparams(params, {})
 
     # noinspection PyTypeChecker
@@ -104,19 +102,21 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
     #                  log_handler=ActivationsScalarHandler(model, reduction=torch.std,
     #                                                       layer_names=['batch_norm', 'repu']),
     #                  event_name=Events.ITERATION_COMPLETED)
-    # tb_logger.close()
+
+    return tb_logger
 
 
 def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
-    run = 'heb/{}/{}'.format(dataset_name, identifier)
+    run = '{}/heb/{}'.format(dataset_name, identifier)
     if run_postfix:
         run += '-' + run_postfix
-    print(run)
+    print("Starting run '{}'".format(run))
 
     # Loading the model and possibly initial weights
-    model = models.create_fc1_model(hu=[28 ** 2, 100], n=1, batch_norm=False)
+    model = models.create_conv1_model(28, 1, num_kernels=400, n=1, batch_norm=True)
+    # model = models.create_fc1_model([28 ** 2, 100])
     if args.initial_weights is not None:
         model = utils.load_weights(model, os.path.join(PATH, args.initial_weights))
         freeze_layers = ['linear1']
@@ -129,7 +129,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     print("Device set to '{}'.".format(device))
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name)
+    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
 
     # Creating the learning rule, optimizer, evaluator and trainer
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
@@ -140,7 +140,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_criterion = torch.nn.CrossEntropyLoss()
         h_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
         h_train_evaluator = SupervisedEvaluator(model=h_model, criterion=h_criterion, device=device)
-        h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-4)
+        h_optimizer = torch.optim.Adam(params=h_model.parameters(), lr=1e-3)
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=5,
                                                                     factor=0.5)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion, device=device)
@@ -193,10 +193,14 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
                              freeze_layers=freeze_layers, device=device)
 
     # Handlers
-    attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params)
+    tb_logger = attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader,
+                                params)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, epochs=params['epochs'])
+
+    # Close the TensorBoard logger
+    tb_logger.close()
 
 
 if __name__ == '__main__':
@@ -225,4 +229,4 @@ if __name__ == '__main__':
     logging.debug("Arguments: {}.".format(vars(args_)))
     logging.debug("Parameters: {}.".format(params_))
 
-    main(args_, params_, dataset_name='mnist')
+    main(args_, params_, dataset_name='mnist-fashion')
