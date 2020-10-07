@@ -68,7 +68,7 @@ trainer.run(train_loader=train_loader, epochs=10)
 ### Visualizations
 Various TensorBoard visualizations are supported.
 
-<img src="docs/visualizers.jpg" alt="Logo" width="300">
+<img src="docs/visualizers.jpg" alt="Logo" width="500">
 
 See [examples](https://github.com/Joxis/pytorch-hebbian/tree/master/examples) for more.
 
