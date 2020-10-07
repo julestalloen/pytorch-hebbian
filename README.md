@@ -99,8 +99,10 @@ Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxi
 
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
-* [ML6](https://ml6.eu/)
 * [Ghent University - IDLab](https://www.ugent.be/ea/idlab/en)
+* [ML6](https://ml6.eu/)
+
+<img src="docs/ml6_logo.png" alt="Logo" width="200">
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
