@@ -22,6 +22,7 @@
 * [Usage](#usage)
 * [Contributing](#contributing)
 * [License](#license)
+* [Reference](#reference)
 * [Contact](#contact)
 * [Acknowledgements](#acknowledgements)
 
