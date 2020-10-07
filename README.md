@@ -30,11 +30,11 @@ Lightweight framework for Hebbian learning based on PyTorch Ignite.
 ## Getting started
 To get a local copy up and running follow these simple steps.
 
-## Prerequisites
+### Prerequisites
 Depending on your system (OS/GPU/CUDA support) you may need to manually install a specific PyTorch version.
 Please see the [PyTorch website](https://pytorch.org/get-started/locally/) for more information.
 
-## Installation
+### Installation
 Clone the repository:
 ```shell script
 pip install git+https://github.ugent.be/jjatallo/pytorch-hebbian.git
