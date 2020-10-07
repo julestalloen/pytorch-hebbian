@@ -39,7 +39,7 @@ Please see the [PyTorch website](https://pytorch.org/get-started/locally/) for m
 ### Installation
 Clone the repository:
 ```shell script
-pip install git+https://github.ugent.be/jjatallo/pytorch-hebbian.git
+pip install git+https://github.com/Joxis/pytorch-hebbian.git
 ```
 
 ## Usage
