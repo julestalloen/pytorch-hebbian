@@ -102,7 +102,9 @@ Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxi
 * [Ghent University - IDLab](https://www.ugent.be/ea/idlab/en)
 * [ML6](https://ml6.eu/)
 
-<img src="docs/ml6_logo.png" alt="Logo" width="200">
+<a href="https://ml6.eu/">
+    <img src="docs/ml6_logo.png" alt="Logo" width="200">
+</a>
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
