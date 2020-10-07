@@ -1,16 +1,86 @@
-# PyTorch Hebbian
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
+
+<br />
+<p align="center">
+  <a href="https://github.com/Joxis/pytorch-hebbian">
+    <img src="docs/neural_net-local.png" alt="Logo" width="80">
+  </a>
+
+  <h3 align="center">PyTorch Hebbian</h3>
+
+  <p align="center">
+    A lightweight framework for Hebbian learning based on PyTorch Ignite.
+  </p>
+</p>
+
+<!-- TABLE OF CONTENTS -->
+## Table of Contents
+
+* [About the Project](#about-the-project)
+* [Getting Started](#getting-started)
+* [Usage](#usage)
+* [Contributing](#contributing)
+* [License](#license)
+* [Contact](#contact)
+
+## About the project
 Lightweight framework for Hebbian learning based on PyTorch Ignite.
 
-## Install
+## Getting started
+To get a local copy up and running follow these simple steps.
+
+## Prerequisites
 Depending on your system (OS/GPU/CUDA support) you may need to manually install a specific PyTorch version.
 Please see the [PyTorch website](https://pytorch.org/get-started/locally/) for more information.
 
+## Installation
 Clone the repository:
 ```shell script
-git clone https://github.ugent.be/jjatallo/pytorch-hebbian.git
+pip install git+https://github.ugent.be/jjatallo/pytorch-hebbian.git
 ```
 
-Install the package locally:
-```shell script
-pip install -e pytorch-hebbian
+## Usage
+Similar to a classic PyTorch pipeline, a model, dataset and data loader are first initiated.
+Next, the framework requires you to specify a learning rule, optimizer and trainer. 
+You can then start Hebbian learning.
+
+### Simple example
+```python
+# Creating the model
+model = models.create_fc1_model([28 ** 2, 400])
+
+# Creating the dataset and data loaders
+dataset = datasets.mnist.MNIST(root=config.DATASETS_DIR, download=True,
+                               transform=transforms.ToTensor())
+train_loader = DataLoader(dataset, batch_size=1024, shuffle=True)
+
+# Creating the learning rule, optimizer and trainer
+learning_rule = KrotovsRule()
+optimizer = Local(named_params=model.named_parameters(), lr=0.01)
+trainer = HebbianTrainer(model=model, learning_rule=learning_rule,
+                         optimizer=optimizer)
+
+# Running the trainer
+trainer.run(train_loader=train_loader, epochs=10)
 ```
+
+See [examples](https://github.com/Joxis/pytorch-hebbian/tree/master/examples) for more.
+
+## Contributing
+Any contributions you make are **greatly appreciated**. For major changes, please open an issue first to discuss what you would like to change.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a pull request
+
+## License
+Distributed under the MIT License. See LICENSE for more information.
+
+## Contact
+Jules Talloen - `<firstname>@<lastname>.eu`
+
+Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxis/pytorch-hebbian)
+
