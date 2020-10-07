@@ -23,9 +23,10 @@
 * [Contributing](#contributing)
 * [License](#license)
 * [Contact](#contact)
+* [Acknowledgements](#acknowledgements)
 
 ## About the project
-Lightweight framework for Hebbian learning based on PyTorch Ignite.
+A lightweight and flexible framework for Hebbian learning in PyTorch.
 
 ## Getting started
 To get a local copy up and running follow these simple steps.
@@ -66,9 +67,9 @@ trainer.run(train_loader=train_loader, epochs=10)
 ```
 
 ### Visualizations
-Various TensorBoard visualizations are supported.
+Various TensorBoard visualizations are supported. Below are some examples.
 
-<img src="docs/visualizers.jpg" alt="Logo" width="500">
+<img src="docs/visualizers.jpg" alt="Logo" width="600">
 
 See [examples](https://github.com/Joxis/pytorch-hebbian/tree/master/examples) for more.
 
@@ -82,12 +83,23 @@ Any contributions you make are **greatly appreciated**. For major changes, pleas
 5. Open a pull request
 
 ## License
-Distributed under the MIT License. See LICENSE for more information.
+Distributed under the MIT License. See [LICENSE](https://github.com/Joxis/pytorch-hebbian/blob/master/LICENSE) for more information.
+
+## Reference
+Please consider citing this work if it helps your research.
+```
+@article{TODO}
+```
 
 ## Contact
 Jules Talloen - `<firstname>@<lastname>.eu`
 
 Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxis/pytorch-hebbian)
+
+<!-- ACKNOWLEDGEMENTS -->
+## Acknowledgements
+* [ML6](https://ml6.eu/)
+* [Ghent University - IDLab](https://www.ugent.be/ea/idlab/en)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
