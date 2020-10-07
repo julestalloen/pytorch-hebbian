@@ -4,7 +4,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/Joxis/pytorch-hebbian">
-    <img src="docs/neural_net-local.png" alt="Logo" width="80">
+    <img src="docs/neural_net-local.png" alt="Logo" width="200">
   </a>
 
   <h3 align="center">PyTorch Hebbian</h3>
@@ -65,6 +65,11 @@ trainer = HebbianTrainer(model=model, learning_rule=learning_rule,
 trainer.run(train_loader=train_loader, epochs=10)
 ```
 
+### Visualizations
+Various TensorBoard visualizations are supported.
+
+<img src="docs/visualizers.jpg" alt="Logo" width="300">
+
 See [examples](https://github.com/Joxis/pytorch-hebbian/tree/master/examples) for more.
 
 ## Contributing
@@ -84,3 +89,9 @@ Jules Talloen - `<firstname>@<lastname>.eu`
 
 Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxis/pytorch-hebbian)
 
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=flat-square
+[issues-url]: https://github.com/Joxis/pytorch-hebbian/issues
+[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=flat-square
+[license-url]: https://github.com/Joxis/pytorch-hebbian/blob/master/LICENSE
