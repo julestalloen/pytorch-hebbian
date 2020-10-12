@@ -108,7 +108,7 @@ Project Link: [https://github.com/Joxis/pytorch-hebbian](https://github.com/Joxi
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=flat-square
+[issues-shield]: https://img.shields.io/github/issues/Joxis/pytorch-hebbian
 [issues-url]: https://github.com/Joxis/pytorch-hebbian/issues
-[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=flat-square
+[license-shield]: https://img.shields.io/github/license/Joxis/pytorch-hebbian
 [license-url]: https://github.com/Joxis/pytorch-hebbian/blob/master/LICENSE
