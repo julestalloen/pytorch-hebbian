@@ -89,7 +89,12 @@ Distributed under the MIT License. See [LICENSE](https://github.com/Joxis/pytorc
 ## Reference
 Please consider citing this work if it helps your research.
 ```
-@article{TODO}
+@inproceedings{talloen2020pytorchhebbian,
+  author       = {Jules Talloen and Joni Dambre and Alexander Vandesompele},
+  location     = {Online},
+  title        = {PyTorch-Hebbian: facilitating local learning in a deep learning framework},
+  year         = {2020},
+}
 ```
 
 ## Contact
