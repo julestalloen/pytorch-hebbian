@@ -10,7 +10,7 @@
   <h3 align="center">PyTorch Hebbian</h3>
 
   <p align="center">
-    A lightweight framework for Hebbian learning based on PyTorch Ignite. Accepted at the <a href="https://beyondbackprop.github.io/">Beyond Backpropagation</a> NeurIPS worskhop.
+    A lightweight framework for Hebbian learning based on PyTorch Ignite. Presented at the <a href="https://beyondbackprop.github.io/">Beyond Backpropagation</a> NeurIPS 2020 worskhop.
   </p>
 </p>
 
