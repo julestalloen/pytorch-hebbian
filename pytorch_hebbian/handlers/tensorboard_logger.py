@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import torch
 import torchvision
-from ignite.contrib.handlers.base_logger import BaseHandler, BaseWeightsScalarHandler, BaseWeightsHistHandler
+from ignite.contrib.handlers.base_logger import BaseHandler, BaseWeightsScalarHandler, BaseWeightsHandler
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger
 from matplotlib import pyplot as plt
 
@@ -52,7 +52,7 @@ class WeightsScalarHandler(BaseWeightsScalarHandler):
             )
 
 
-class WeightsHistHandler(BaseWeightsHistHandler):
+class WeightsHistHandler(BaseWeightsHandler):
     """Helper handler to log model's weights as histograms.
 
     Args:
@@ -60,26 +60,26 @@ class WeightsHistHandler(BaseWeightsHistHandler):
         tag (str, optional): common title for all produced plots. For example, 'generator'
     """
 
-    def __init__(self, model, layer_names=None, tag=None):
+    def __init__(self, model, tag=None):
         super(WeightsHistHandler, self).__init__(model, tag=tag)
-        self.layer_names = layer_names
 
     def __call__(self, engine, logger, event_name):
-        if not isinstance(logger, TensorboardLogger):
-            raise RuntimeError("Handler 'WeightsHistHandler' works only with TensorboardLogger")
+        if not isinstance(logger, TrainsLogger):
+            raise RuntimeError("Handler 'WeightsHistHandler' works only with TrainsLogger")
 
         global_step = engine.state.get_event_attrib_value(event_name)
         tag_prefix = "{}/".format(self.tag) if self.tag else ""
         for name, p in self.model.named_parameters():
-            if self.layer_names is not None:
-                if name.split('.')[0] not in self.layer_names:
-                    continue
+            if p.grad is None:
+                continue
 
-            name = name.replace(".", "/")
-            logger.writer.add_histogram(
-                tag="{}weights/{}".format(tag_prefix, name),
-                values=p.data.detach().cpu().numpy(),
-                global_step=global_step,
+            title_name, _, series_name = name.partition(".")
+
+            logger.grad_helper.add_histogram(
+                title="{}weights_{}".format(tag_prefix, title_name),
+                series=series_name,
+                step=global_step,
+                hist_data=p.grad.detach().cpu().numpy(),
             )
 
 
@@ -183,7 +183,7 @@ class ActivationsScalarHandler(BaseWeightsScalarHandler):
             )
 
 
-class ActivationsHistHandler(BaseWeightsHistHandler):
+class ActivationsHistHandler(BaseWeightsHandler):
     """Helper handler to log model's activations as histograms.
 
     Args:

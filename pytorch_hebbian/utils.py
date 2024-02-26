@@ -8,6 +8,8 @@ from ignite.utils import convert_tensor
 from matplotlib import pyplot as plt
 from torch.utils.data import random_split
 
+import traceback
+import sys
 # TODO: find better fix
 #   https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
 matplotlib.use('Agg')
@@ -47,10 +49,11 @@ def extract_image_patches(x, kernel_size, stride=(1, 1), dilation=1, padding=0):
     return patches.view(-1, kernel_size[0], kernel_size[1])
 
 
-def split_dataset(dataset, val_split):
+def split_dataset(dataset, device, val_split):
     val_size = int(val_split * len(dataset))
     train_size = len(dataset) - val_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    device = get_device(device)
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator(device=device))
 
     return train_dataset, val_dataset
 
@@ -122,13 +125,15 @@ def get_device(device=None):
     if device is None:
         if torch.cuda.is_available():
             device = 'cuda'
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+            torch.set_default_device('cuda')
+            torch.set_default_dtype(torch.float64)
         else:
             device = 'cpu'
     elif device == 'cuda':
         if torch.cuda.is_available():
             device = 'cuda'
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+            torch.set_default_device('cuda')
+            torch.set_default_dtype(torch.float64)
         else:
             device = 'cpu'
     else:
@@ -136,5 +141,6 @@ def get_device(device=None):
 
     if device == 'cuda':
         logger.info("CUDA device set to '{}'.".format(torch.cuda.get_device_name(0)))
+        
 
     return device

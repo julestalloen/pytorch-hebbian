@@ -3,6 +3,7 @@ import os
 import random
 
 import torch
+from torch import Generator
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
@@ -11,9 +12,10 @@ from pytorch_hebbian import config, utils
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def get_data(params, dataset_name, subset=None):
+def get_data(params, dataset_name, device, subset=None):
     load_test = 'train_all' in params and params['train_all']
     test_dataset = None
+    device = utils.get_device(device)
 
     # Loading the dataset and creating the data loaders and transforms
     transform = transforms.Compose([
@@ -41,12 +43,12 @@ def get_data(params, dataset_name, subset=None):
         dataset = Subset(dataset, random.sample(range(len(dataset)), subset))
 
     if load_test:
-        train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = DataLoader(test_dataset, batch_size=params['val_batch_size'], shuffle=False)
+        train_loader = DataLoader(dataset, batch_size=params['train_batch_size'], shuffle=True, generator=Generator(device=device))
+        val_loader = DataLoader(test_dataset, batch_size=params['val_batch_size'], shuffle=False, generator=Generator(device=device))
     else:
-        train_dataset, val_dataset = utils.split_dataset(dataset, val_split=params['val_split'])
-        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False)
+        train_dataset, val_dataset = utils.split_dataset(dataset, device, val_split=params['val_split'])
+        train_loader = DataLoader(train_dataset, batch_size=params['train_batch_size'], shuffle=True, generator=Generator(device=device))
+        val_loader = DataLoader(val_dataset, batch_size=params['val_batch_size'], shuffle=False, generator=Generator(device=device))
 
     # Analyze dataset
     data_batch = next(iter(train_loader))[0]

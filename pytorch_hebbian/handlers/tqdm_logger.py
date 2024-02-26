@@ -2,7 +2,8 @@ import numbers
 import warnings
 
 import torch
-from ignite.contrib.handlers.base_logger import BaseOutputHandler, BaseLogger
+from ignite.contrib.handlers.base_logger import BaseLogger
+from ignite.contrib.handlers.mlflow_logger import BaseOutputHandler
 
 
 class OutputHandler(BaseOutputHandler):
@@ -27,7 +28,7 @@ class OutputHandler(BaseOutputHandler):
         if not isinstance(logger, TqdmLogger):
             raise RuntimeError("Handler 'OutputHandler' works only with TqdmLogger")
 
-        metrics = self._setup_output_metrics(engine)
+        metrics = self._setup_output_metrics_state_attrs(engine)
 
         global_step = self.global_step_transform(engine, event_name)
 
