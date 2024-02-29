@@ -74,7 +74,6 @@ class HebbianTrainer(Trainer):
                  optimizer: Optimizer, supervised_from: int = -1, freeze_layers: List[str] = None,
                  complete_forward: bool = False, single_forward: bool = False,
                  device: Optional[Union[str, torch.device]] = None):
-        device = utils.get_device(device)
         engine = self.create_hebbian_trainer(model, learning_rule, optimizer, device=device)
         self.supervised_from = supervised_from
         self.freeze_layers = freeze_layers
@@ -152,6 +151,7 @@ class HebbianTrainer(Trainer):
 
         x = x.view((x.shape[0], -1))
         self.logger.debug("Prepared inputs and weights with shapes {} and {}.".format(list(x.shape), list(w.shape)))
+
         return x, w
 
     def _prepare_data2(self, layer, layer_name):

@@ -25,9 +25,11 @@ from pytorch_hebbian.trainers import HebbianTrainer, SupervisedTrainer
 PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params):
+def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader, params, device):
     # Metrics
-    UnitConvergence(model[0], learning_rule.norm).attach(trainer.engine, 'unit_conv')
+    device = utils.get_device(device)
+    
+    UnitConvergence(model[0], learning_rule.norm, device=device).attach(trainer.engine, 'unit_conv')
 
     # Tqdm logger
     pbar = ProgressBar(persist=True, bar_format=config.IGNITE_BAR_FORMAT)
@@ -107,6 +109,8 @@ def attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, tr
 
 
 def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
+    torch.set_default_device(args.device)
+    torch.set_default_dtype(torch.float64)
     # Creating an identifier for this run
     identifier = time.strftime("%Y%m%d-%H%M%S")
     run = '{}/heb/{}'.format(dataset_name, identifier)
@@ -128,7 +132,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
     print("Device set to '{}'.".format(device))
 
     # Data loaders
-    train_loader, val_loader = data.get_data(params, dataset_name, subset=10000)
+    train_loader, val_loader = data.get_data(params, dataset_name, device, subset=10000)
 
     # Creating the learning rule, optimizer, evaluator and trainer
     learning_rule = KrotovsRule(delta=params['delta'], k=params['k'], norm=params['norm'], normalize=False)
@@ -143,7 +147,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
         h_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(h_optimizer, 'max', verbose=True, patience=5,
                                                                     factor=0.5)
         h_trainer = SupervisedTrainer(model=h_model, optimizer=h_optimizer, criterion=h_criterion, device=device)
-
+        
         # Tqdm logger
         h_pbar = ProgressBar(persist=False, bar_format=config.IGNITE_BAR_FORMAT)
         h_pbar.attach(h_trainer.engine, metric_names='all')
@@ -193,7 +197,7 @@ def main(args: Namespace, params: dict, dataset_name, run_postfix=""):
 
     # Handlers
     tb_logger = attach_handlers(run, model, optimizer, learning_rule, trainer, evaluator, train_loader, val_loader,
-                                params)
+                                params, device)
 
     # Running the trainer
     trainer.run(train_loader=train_loader, epochs=params['epochs'])
